@@ -1,0 +1,296 @@
+import Product from '../models/Product.js';
+import Category from '../models/Category.js';
+import QRCode from 'qrcode';
+
+export const createProduct = async (req, res) => {
+  try {
+    const product = new Product(req.body);
+    
+    // Generate QR code
+    const qrCodeData = JSON.stringify({
+      id: product._id,
+      name: product.name,
+      sku: product.sku,
+      price: product.sellingPrice
+    });
+    
+    product.qrCode = await QRCode.toDataURL(qrCodeData);
+    
+    await product.save();
+
+    // Update category product count
+    const category = await Category.findOne({ name: product.category });
+    if (category) {
+      await category.updateProductCount();
+    }
+    
+    res.status(201).json({
+      success: true,
+      message: 'Product created successfully',
+      product
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+export const getProducts = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, search, category, isActive } = req.query;
+    
+    const query = {};
+    
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { sku: { $regex: search, $options: 'i' } },
+        { barcodeId: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    if (category) {
+      query.category = category;
+    }
+    
+    if (isActive !== undefined) {
+      query.isActive = isActive === 'true';
+    }
+    
+    const products = await Product.find(query)
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .sort({ createdAt: -1 });
+    
+    const total = await Product.countDocuments(query);
+    
+    res.json({
+      success: true,
+      products,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+export const getProduct = async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id);
+    
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      product
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+export const updateProduct = async (req, res) => {
+  try {
+    const oldProduct = await Product.findById(req.params.id);
+    if (!oldProduct) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+
+    const product = await Product.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true, runValidators: true }
+    );
+    
+    // Update QR code if name, SKU, or price changed
+    if (req.body.name || req.body.sku || req.body.sellingPrice) {
+      const qrCodeData = JSON.stringify({
+        id: product._id,
+        name: product.name,
+        sku: product.sku,
+        price: product.sellingPrice
+      });
+      
+      product.qrCode = await QRCode.toDataURL(qrCodeData);
+      await product.save();
+    }
+
+    // Update category product counts if category changed
+    if (oldProduct.category !== product.category) {
+      const oldCategory = await Category.findOne({ name: oldProduct.category });
+      const newCategory = await Category.findOne({ name: product.category });
+      
+      if (oldCategory) await oldCategory.updateProductCount();
+      if (newCategory) await newCategory.updateProductCount();
+    }
+    
+    res.json({
+      success: true,
+      message: 'Product updated successfully',
+      product
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+export const deleteProduct = async (req, res) => {
+  try {
+    const product = await Product.findByIdAndDelete(req.params.id);
+    
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+
+    // Update category product count
+    const category = await Category.findOne({ name: product.category });
+    if (category) {
+      await category.updateProductCount();
+    }
+    
+    res.json({
+      success: true,
+      message: 'Product deleted successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+export const searchProducts = async (req, res) => {
+  try {
+    const { query } = req.query;
+    
+    if (!query) {
+      return res.json({
+        success: true,
+        products: []
+      });
+    }
+    
+    const products = await Product.find({
+      $and: [
+        { isActive: true },
+        {
+          $or: [
+            { name: { $regex: query, $options: 'i' } },
+            { sku: { $regex: query, $options: 'i' } },
+            { barcodeId: { $regex: query, $options: 'i' } }
+          ]
+        }
+      ]
+    }).limit(10);
+    
+    res.json({
+      success: true,
+      products
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+export const getProductByBarcode = async (req, res) => {
+  try {
+    const { barcode } = req.params;
+    
+    const product = await Product.findOne({
+      barcodeId: barcode,
+      isActive: true
+    });
+    
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      product
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+export const getCategories = async (req, res) => {
+  try {
+    const categories = await Category.find({ isActive: true })
+      .sort({ sortOrder: 1, name: 1 })
+      .select('name');
+    
+    res.json({
+      success: true,
+      categories: categories.map(cat => cat.name)
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+export const updateStock = async (req, res) => {
+  try {
+    const { products } = req.body;
+    
+    const updatePromises = products.map(({ id, quantity }) => {
+      return Product.findByIdAndUpdate(
+        id,
+        { $inc: { stock: -quantity } },
+        { new: true }
+      );
+    });
+    
+    await Promise.all(updatePromises);
+    
+    res.json({
+      success: true,
+      message: 'Stock updated successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};

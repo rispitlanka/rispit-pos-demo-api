@@ -6,6 +6,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import cron from 'node-cron';
 
+// Import Swagger
+import { specs, swaggerUi } from './config/swagger.js';
+
 // Import routes
 import authRoutes from './routes/authRoutes.js';
 import productRoutes from './routes/productRoutes.js';
@@ -47,6 +50,13 @@ mongoose.connection.on('error', (err) => {
   console.error('MongoDB connection error:', err);
 });
 
+// Swagger Documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
+  explorer: true,
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'POS System API Documentation'
+}));
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
@@ -63,11 +73,35 @@ app.use('/api/returns', returnRoutes);
 app.use('/api/uploads', uploadRoutes);
 
 // Welcome endpoint - no auth required
+/**
+ * @swagger
+ * /:
+ *   get:
+ *     summary: Get API welcome message
+ *     tags: [System]
+ *     responses:
+ *       200:
+ *         description: Welcome message
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "POS System API v1.0"
+ *                 status:
+ *                   type: string
+ *                   example: "active"
+ *                 documentation:
+ *                   type: string
+ *                   example: "Available at /api-docs"
+ */
 app.get('/', (req, res) => {
   res.send({ 
     message: 'POS System API v1.0',
     status: 'active',
-    documentation: 'Contact admin for API documentation'
+    documentation: 'Available at /api-docs'
   });
 });
 

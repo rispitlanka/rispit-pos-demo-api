@@ -18,6 +18,7 @@ import productVariationRoutes from './routes/productVariationRoutes.js';
 import staffRoutes from './routes/staffRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
+import returnRoutes from './routes/returnRoutes.js';
 
 dotenv.config();
 
@@ -56,7 +57,7 @@ app.use('/api/product-variations', productVariationRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/reports', reportRoutes);
-
+app.use('/api/returns', returnRoutes);
 
 // Welcome endpoint - no auth required
 app.get('/', (req, res) => {

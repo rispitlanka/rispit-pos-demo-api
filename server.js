@@ -13,6 +13,8 @@ import categoryRoutes from './routes/categoryRoutes.js';
 import customerRoutes from './routes/customerRoutes.js';
 import saleRoutes from './routes/saleRoutes.js';
 import expenseRoutes from './routes/expenseRoutes.js';
+import expenseCategoryRoutes from './routes/expenseCategoryRoutes.js';
+import productVariationRoutes from './routes/productVariationRoutes.js';
 import staffRoutes from './routes/staffRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
@@ -49,6 +51,8 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/sales', saleRoutes);
 app.use('/api/expenses', expenseRoutes);
+app.use('/api/expense-categories', expenseCategoryRoutes);
+app.use('/api/product-variations', productVariationRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/reports', reportRoutes);
@@ -56,7 +60,7 @@ app.use('/api/reports', reportRoutes);
 
 // Welcome endpoint - no auth required
 app.get('/', (req, res) => {
-  res.json({ 
+  res.send({ 
     message: 'POS System API v1.0',
     status: 'active',
     documentation: 'Contact admin for API documentation'

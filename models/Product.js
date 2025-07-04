@@ -1,22 +1,29 @@
 import mongoose from 'mongoose';
 
-const variantSchema = new mongoose.Schema({
-  name: {
+const productVariationSchema = new mongoose.Schema({
+  variationId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'ProductVariation',
+    required: true
+  },
+  variationName: {
     type: String,
     required: true
   },
-  value: {
-    type: String,
-    required: true
-  },
-  priceAdjustment: {
-    type: Number,
-    default: 0
-  },
-  stock: {
-    type: Number,
-    default: 0
-  }
+  selectedValues: [{
+    valueId: {
+      type: String,
+      required: true
+    },
+    value: {
+      type: String,
+      required: true
+    },
+    priceAdjustment: {
+      type: Number,
+      default: 0
+    }
+  }]
 });
 
 const productSchema = new mongoose.Schema({
@@ -68,7 +75,7 @@ const productSchema = new mongoose.Schema({
   qrCode: {
     type: String
   },
-  variants: [variantSchema],
+  variations: [productVariationSchema],
   images: [{
     type: String
   }],

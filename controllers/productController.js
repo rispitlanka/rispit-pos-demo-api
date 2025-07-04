@@ -1,10 +1,16 @@
 import Product from '../models/Product.js';
 import Category from '../models/Category.js';
 import QRCode from 'qrcode';
+import { deleteFromCloudinary, getPublicIdFromUrl } from '../config/cloudinary.js';
 
 export const createProduct = async (req, res) => {
   try {
     const product = new Product(req.body);
+    
+    // Add uploaded images if any
+    if (req.files && req.files.length > 0) {
+      product.images = req.files.map(file => file.path);
+    }
     
     // Generate QR code
     const qrCodeData = JSON.stringify({
@@ -160,7 +166,7 @@ export const updateProduct = async (req, res) => {
 
 export const deleteProduct = async (req, res) => {
   try {
-    const product = await Product.findByIdAndDelete(req.params.id);
+    const product = await Product.findById(req.params.id);
     
     if (!product) {
       return res.status(404).json({
@@ -168,6 +174,23 @@ export const deleteProduct = async (req, res) => {
         message: 'Product not found'
       });
     }
+
+    // Delete all product images from Cloudinary
+    if (product.images && product.images.length > 0) {
+      for (const imageUrl of product.images) {
+        try {
+          const publicId = getPublicIdFromUrl(imageUrl);
+          if (publicId) {
+            await deleteFromCloudinary(publicId);
+          }
+        } catch (error) {
+          console.error('Error deleting image from Cloudinary:', error);
+        }
+      }
+    }
+
+    // Delete the product
+    await Product.findByIdAndDelete(req.params.id);
 
     // Update category product count
     const category = await Category.findOne({ name: product.category });
@@ -286,6 +309,153 @@ export const updateStock = async (req, res) => {
     res.json({
       success: true,
       message: 'Stock updated successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+export const uploadProductImages = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No files uploaded'
+      });
+    }
+    
+    const product = await Product.findById(id);
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+    
+    // Get uploaded image URLs from Cloudinary
+    const newImageUrls = req.files.map(file => file.path);
+    
+    // Add new images to the product
+    product.images.push(...newImageUrls);
+    
+    await product.save();
+    
+    res.json({
+      success: true,
+      message: 'Images uploaded successfully',
+      images: newImageUrls,
+      product
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+export const deleteProductImage = async (req, res) => {
+  try {
+    const { id, imageIndex } = req.params;
+    
+    const product = await Product.findById(id);
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+    
+    if (imageIndex >= product.images.length || imageIndex < 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid image index'
+      });
+    }
+    
+    // Get the image URL to delete from Cloudinary
+    const imageUrl = product.images[imageIndex];
+    
+    // Delete from Cloudinary
+    try {
+      const publicId = getPublicIdFromUrl(imageUrl);
+      if (publicId) {
+        await deleteFromCloudinary(publicId);
+      }
+    } catch (error) {
+      console.error('Error deleting image from Cloudinary:', error);
+    }
+    
+    // Remove image from product
+    product.images.splice(imageIndex, 1);
+    await product.save();
+    
+    res.json({
+      success: true,
+      message: 'Image deleted successfully',
+      product
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+export const updateProductImage = async (req, res) => {
+  try {
+    const { id, imageIndex } = req.params;
+    
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No file uploaded'
+      });
+    }
+    
+    const product = await Product.findById(id);
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+    
+    if (imageIndex >= product.images.length || imageIndex < 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid image index'
+      });
+    }
+    
+    // Get the old image URL to delete from Cloudinary
+    const oldImageUrl = product.images[imageIndex];
+    
+    // Delete old image from Cloudinary
+    try {
+      const publicId = getPublicIdFromUrl(oldImageUrl);
+      if (publicId) {
+        await deleteFromCloudinary(publicId);
+      }
+    } catch (error) {
+      console.error('Error deleting old image from Cloudinary:', error);
+    }
+    
+    // Update with new image URL
+    product.images[imageIndex] = req.file.path;
+    await product.save();
+    
+    res.json({
+      success: true,
+      message: 'Image updated successfully',
+      imageUrl: req.file.path,
+      product
     });
   } catch (error) {
     res.status(500).json({

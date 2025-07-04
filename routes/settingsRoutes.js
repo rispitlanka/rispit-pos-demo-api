@@ -5,9 +5,8 @@ import {
   uploadLogo
 } from '../controllers/settingsController.js';
 import { authenticate, authorize } from '../middleware/auth.js';
-import multer from 'multer';
+import { upload } from '../config/cloudinary.js';
 
-const upload = multer({ dest: 'uploads/' });
 const router = express.Router();
 
 router.get('/', authenticate, getSettings);

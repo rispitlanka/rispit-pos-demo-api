@@ -1,4 +1,5 @@
 import Expense from '../models/Expense.js';
+import { deleteFromCloudinary, getPublicIdFromUrl } from '../config/cloudinary.js';
 
 export const createExpense = async (req, res) => {
   try {
@@ -7,6 +8,11 @@ export const createExpense = async (req, res) => {
       addedBy: req.user.userId,
       addedByName: req.currentUser.fullName
     });
+    
+    // Add uploaded receipt if any
+    if (req.file) {
+      expense.receipt = req.file.path;
+    }
     
     await expense.save();
     
@@ -130,7 +136,7 @@ export const updateExpense = async (req, res) => {
 
 export const deleteExpense = async (req, res) => {
   try {
-    const expense = await Expense.findByIdAndDelete(req.params.id);
+    const expense = await Expense.findById(req.params.id);
     
     if (!expense) {
       return res.status(404).json({
@@ -138,6 +144,21 @@ export const deleteExpense = async (req, res) => {
         message: 'Expense not found'
       });
     }
+
+    // Delete receipt from Cloudinary if it exists
+    if (expense.receipt) {
+      try {
+        const publicId = getPublicIdFromUrl(expense.receipt);
+        if (publicId) {
+          await deleteFromCloudinary(publicId);
+        }
+      } catch (error) {
+        console.error('Error deleting receipt from Cloudinary:', error);
+      }
+    }
+
+    // Delete the expense
+    await Expense.findByIdAndDelete(req.params.id);
     
     res.json({
       success: true,
@@ -207,6 +228,101 @@ export const getExpenseSummary = async (req, res) => {
       success: true,
       summary,
       total: totalExpenses[0] || { total: 0, count: 0 }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+export const uploadExpenseReceipt = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No file uploaded'
+      });
+    }
+    
+    const expense = await Expense.findById(id);
+    if (!expense) {
+      return res.status(404).json({
+        success: false,
+        message: 'Expense not found'
+      });
+    }
+    
+    // Delete old receipt from Cloudinary if it exists
+    if (expense.receipt) {
+      try {
+        const publicId = getPublicIdFromUrl(expense.receipt);
+        if (publicId) {
+          await deleteFromCloudinary(publicId);
+        }
+      } catch (error) {
+        console.error('Error deleting old receipt from Cloudinary:', error);
+      }
+    }
+    
+    // Update expense with new receipt URL
+    expense.receipt = req.file.path;
+    await expense.save();
+    
+    res.json({
+      success: true,
+      message: 'Receipt uploaded successfully',
+      receiptUrl: req.file.path,
+      expense
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+export const deleteExpenseReceipt = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const expense = await Expense.findById(id);
+    if (!expense) {
+      return res.status(404).json({
+        success: false,
+        message: 'Expense not found'
+      });
+    }
+    
+    if (!expense.receipt) {
+      return res.status(400).json({
+        success: false,
+        message: 'No receipt found for this expense'
+      });
+    }
+    
+    // Delete receipt from Cloudinary
+    try {
+      const publicId = getPublicIdFromUrl(expense.receipt);
+      if (publicId) {
+        await deleteFromCloudinary(publicId);
+      }
+    } catch (error) {
+      console.error('Error deleting receipt from Cloudinary:', error);
+    }
+    
+    // Remove receipt from expense
+    expense.receipt = undefined;
+    await expense.save();
+    
+    res.json({
+      success: true,
+      message: 'Receipt deleted successfully',
+      expense
     });
   } catch (error) {
     res.status(500).json({

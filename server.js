@@ -19,6 +19,7 @@ import staffRoutes from './routes/staffRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import returnRoutes from './routes/returnRoutes.js';
+import uploadRoutes from './routes/uploadRoutes.js';
 
 dotenv.config();
 
@@ -34,9 +35,6 @@ const PORT = process.env.PORT || 8080;
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-// app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-const uploadPath = path.join('/tmp', 'uploads');
-app.use('/uploads', express.static(uploadPath));
 
 // MongoDB connection
 mongoose.connect(process.env.MONGODB_URI);
@@ -62,6 +60,7 @@ app.use('/api/staff', staffRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/returns', returnRoutes);
+app.use('/api/uploads', uploadRoutes);
 
 // Welcome endpoint - no auth required
 app.get('/', (req, res) => {

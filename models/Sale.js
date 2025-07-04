@@ -144,20 +144,28 @@ const saleSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Generate invoice number
+// Generate invoice number if not provided (fallback)
 saleSchema.pre('save', async function(next) {
-  if (!this.invoiceNumber) {
-    const today = new Date();
-    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
-    const count = await this.constructor.countDocuments({
-      createdAt: {
-        $gte: new Date(today.getFullYear(), today.getMonth(), today.getDate()),
-        $lt: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1)
-      }
-    });
-    this.invoiceNumber = `INV-${dateStr}-${String(count + 1).padStart(4, '0')}`;
+  try {
+    if (!this.invoiceNumber) {
+      const today = new Date();
+      const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+      
+      // Get count of sales for today
+      const count = await this.constructor.countDocuments({
+        createdAt: {
+          $gte: new Date(today.getFullYear(), today.getMonth(), today.getDate()),
+          $lt: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1)
+        }
+      });
+      
+      // Generate unique invoice number
+      this.invoiceNumber = `INV-${dateStr}-${String(count + 1).padStart(4, '0')}`;
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 });
 
 export default mongoose.model('Sale', saleSchema);

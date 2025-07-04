@@ -39,8 +39,36 @@ export const createSale = async (req, res) => {
     // Calculate loyalty points earned
     const loyaltyPointsEarned = Math.floor(total / 100); // 1 point per 100 LKR
 
+    // Generate invoice number with retry logic for race conditions
+    let invoiceNumber;
+    let retryCount = 0;
+    const maxRetries = 3;
+
+    while (retryCount < maxRetries) {
+      try {
+        const today = new Date();
+        const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+        const count = await Sale.countDocuments({
+          createdAt: {
+            $gte: new Date(today.getFullYear(), today.getMonth(), today.getDate()),
+            $lt: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1)
+          }
+        });
+        invoiceNumber = `INV-${dateStr}-${String(count + 1).padStart(4, '0')}`;
+        break;
+      } catch (error) {
+        retryCount++;
+        if (retryCount >= maxRetries) {
+          throw new Error('Failed to generate invoice number after multiple attempts');
+        }
+        // Wait a bit before retrying
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+
     // Create sale
     const sale = new Sale({
+      invoiceNumber,
       items,
       customer,
       customerInfo,

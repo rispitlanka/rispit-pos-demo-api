@@ -291,6 +291,58 @@ export const getDashboardStats = async (req, res) => {
       }
     ]);
     
+    // Today's payment methods breakdown
+    const todayPayments = await Sale.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: startOfDay, $lt: endOfDay }
+        }
+      },
+      { $unwind: '$payments' },
+      {
+        $group: {
+          _id: '$payments.method',
+          totalAmount: { $sum: '$payments.amount' },
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+    
+    // Today's expenses
+    const todayExpenses = await Expense.aggregate([
+      {
+        $match: {
+          date: { $gte: startOfDay, $lt: endOfDay }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalExpenses: { $sum: '$amount' },
+          totalCount: { $sum: 1 }
+        }
+      }
+    ]);
+    
+    // Cash register calculation (cash sales - cash expenses)
+    const cashSales = todayPayments.find(p => p._id === 'cash')?.totalAmount || 0;
+    const cashExpenses = await Expense.aggregate([
+      {
+        $match: {
+          date: { $gte: startOfDay, $lt: endOfDay },
+          paymentMethod: 'cash'
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalCashExpenses: { $sum: '$amount' }
+        }
+      }
+    ]);
+    
+    const cashInRegister = cashSales - (cashExpenses[0]?.totalCashExpenses || 0);
+    
     // This month's sales
     const monthSales = await Sale.aggregate([
       {
@@ -365,13 +417,42 @@ export const getDashboardStats = async (req, res) => {
       .limit(10)
       .select('invoiceNumber total customerInfo cashierName createdAt');
     
+    // Returns today
+    const todayReturns = await Sale.aggregate([
+      {
+        $match: {
+          returnedItems: { $exists: true, $not: { $size: 0 } },
+          'returnedItems.returnDate': { $gte: startOfDay, $lt: endOfDay }
+        }
+      },
+      { $unwind: '$returnedItems' },
+      {
+        $match: {
+          'returnedItems.returnDate': { $gte: startOfDay, $lt: endOfDay }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalReturns: { $sum: 1 },
+          totalRefundAmount: { $sum: '$returnedItems.item.totalPrice' }
+        }
+      }
+    ]);
+    
     res.json({
       success: true,
       stats: {
-        today: todaySales[0] || { totalSales: 0, totalOrders: 0 },
+        today: {
+          ...(todaySales[0] || { totalSales: 0, totalOrders: 0 }),
+          expenses: todayExpenses[0]?.totalExpenses || 0,
+          returns: todayReturns[0]?.totalRefundAmount || 0,
+          cashInRegister
+        },
         month: monthSales[0] || { totalSales: 0, totalOrders: 0 },
         products: productStats[0] || { totalProducts: 0, lowStockProducts: 0, outOfStockProducts: 0 },
-        customers: customerStats[0] || { totalCustomers: 0, totalLoyaltyPoints: 0 }
+        customers: customerStats[0] || { totalCustomers: 0, totalLoyaltyPoints: 0 },
+        paymentMethods: todayPayments
       },
       topProducts,
       recentSales

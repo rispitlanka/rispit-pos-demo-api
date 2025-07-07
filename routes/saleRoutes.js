@@ -114,10 +114,21 @@ router.post('/', authenticate, createSale);
  *           default: 10
  *         description: Items per page
  *       - in: query
- *         name: cashier
+ *         name: search
  *         schema:
  *           type: string
- *         description: Filter by cashier ID
+ *         description: Search by invoice number
+ *       - in: query
+ *         name: date
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter by specific date (YYYY-MM-DD)
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *         description: Filter by sale status
  *       - in: query
  *         name: customer
  *         schema:

@@ -121,7 +121,7 @@ export const createSale = async (req, res) => {
 
 export const getSales = async (req, res) => {
   try {
-    const { page = 1, limit = 10, search, date, status } = req.query;
+    const { page = 1, limit = 10, search, date, status, customer } = req.query;
     
     const query = {};
     
@@ -142,6 +142,10 @@ export const getSales = async (req, res) => {
     
     if (status) {
       query.status = status;
+    }
+    
+    if (customer) {
+      query.customer = customer;
     }
     
     const sales = await Sale.find(query)

@@ -112,7 +112,7 @@ app.listen(PORT, () => {
   // Start cron job to hit root route every 14 minutes
   cron.schedule('*/14 * * * *', async () => {
     try {
-      const response = await fetch(`http://localhost:${PORT}/`);
+      const response = await fetch(`https://rispit-pos-api.onrender.com`);
       const data = await response.json();
       console.log(`Cron job executed at ${new Date().toISOString()} - Status: ${data.status}`);
     } catch (error) {

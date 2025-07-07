@@ -10,6 +10,9 @@ const variationValueSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  image: {
+    type: String
+  },
   isActive: {
     type: Boolean,
     default: true

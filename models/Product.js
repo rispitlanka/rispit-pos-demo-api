@@ -76,9 +76,9 @@ const productSchema = new mongoose.Schema({
     type: String
   },
   variations: [productVariationSchema],
-  images: [{
+  image: {
     type: String
-  }],
+  },
   isActive: {
     type: Boolean,
     default: true

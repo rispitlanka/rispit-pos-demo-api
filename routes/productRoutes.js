@@ -9,7 +9,7 @@ import {
   getProductByBarcode,
   getCategories,
   updateStock,
-  uploadProductImages,
+  uploadProductImage,
   deleteProductImage,
   updateProductImage
 } from '../controllers/productController.js';
@@ -69,12 +69,10 @@ const router = express.Router();
  *               barcode:
  *                 type: string
  *                 description: Product barcode
- *               images:
- *                 type: array
- *                 items:
- *                   type: string
- *                   format: binary
- *                 description: Product images (max 5)
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *                 description: Product image
  *     responses:
  *       201:
  *         description: Product created successfully
@@ -106,7 +104,7 @@ const router = express.Router();
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/', authenticate, authorize('admin'), optionalUpload.array('images', 5), createProduct);
+router.post('/', authenticate, authorize('admin'), optionalUpload.single('image'), createProduct);
 
 /**
  * @swagger
@@ -503,9 +501,9 @@ router.put('/stock/update', authenticate, updateStock);
 // Image upload routes
 /**
  * @swagger
- * /api/products/{id}/images:
+ * /api/products/{id}/image:
  *   post:
- *     summary: Upload product images
+ *     summary: Upload product image
  *     tags: [Products]
  *     security:
  *       - bearerAuth: []
@@ -523,17 +521,15 @@ router.put('/stock/update', authenticate, updateStock);
  *           schema:
  *             type: object
  *             required:
- *               - images
+ *               - image
  *             properties:
- *               images:
- *                 type: array
- *                 items:
- *                   type: string
- *                   format: binary
- *                 description: Product images (max 5)
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *                 description: Product image
  *     responses:
  *       200:
- *         description: Images uploaded successfully
+ *         description: Image uploaded successfully
  *         content:
  *           application/json:
  *             schema:
@@ -541,6 +537,9 @@ router.put('/stock/update', authenticate, updateStock);
  *               properties:
  *                 message:
  *                   type: string
+ *                 image:
+ *                   type: string
+ *                   description: Uploaded image URL
  *                 product:
  *                   $ref: '#/components/schemas/Product'
  *       401:
@@ -556,11 +555,11 @@ router.put('/stock/update', authenticate, updateStock);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/:id/images', authenticate, authorize('admin'), upload.array('images', 5), uploadProductImages);
+router.post('/:id/image', authenticate, authorize('admin'), upload.single('image'), uploadProductImage);
 
 /**
  * @swagger
- * /api/products/{id}/images/{imageIndex}:
+ * /api/products/{id}/image:
  *   delete:
  *     summary: Delete product image
  *     tags: [Products]
@@ -573,12 +572,6 @@ router.post('/:id/images', authenticate, authorize('admin'), upload.array('image
  *         schema:
  *           type: string
  *         description: Product ID
- *       - in: path
- *         name: imageIndex
- *         required: true
- *         schema:
- *           type: integer
- *         description: Image index to delete
  *     responses:
  *       200:
  *         description: Image deleted successfully
@@ -604,11 +597,11 @@ router.post('/:id/images', authenticate, authorize('admin'), upload.array('image
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.delete('/:id/images/:imageIndex', authenticate, authorize('admin'), deleteProductImage);
+router.delete('/:id/image', authenticate, authorize('admin'), deleteProductImage);
 
 /**
  * @swagger
- * /api/products/{id}/images/{imageIndex}:
+ * /api/products/{id}/image:
  *   put:
  *     summary: Update product image
  *     tags: [Products]
@@ -621,12 +614,6 @@ router.delete('/:id/images/:imageIndex', authenticate, authorize('admin'), delet
  *         schema:
  *           type: string
  *         description: Product ID
- *       - in: path
- *         name: imageIndex
- *         required: true
- *         schema:
- *           type: integer
- *         description: Image index to update
  *     requestBody:
  *       required: true
  *       content:
@@ -665,6 +652,6 @@ router.delete('/:id/images/:imageIndex', authenticate, authorize('admin'), delet
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.put('/:id/images/:imageIndex', authenticate, authorize('admin'), upload.single('image'), updateProductImage);
+router.put('/:id/image', authenticate, authorize('admin'), upload.single('image'), updateProductImage);
 
 export default router;

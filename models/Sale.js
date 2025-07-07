@@ -144,12 +144,11 @@ const saleSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Generate invoice number if not provided (fallback)
+// Generate short invoice number if not provided (fallback)
 saleSchema.pre('save', async function(next) {
   try {
     if (!this.invoiceNumber) {
       const today = new Date();
-      const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
       
       // Get count of sales for today
       const count = await this.constructor.countDocuments({
@@ -159,8 +158,8 @@ saleSchema.pre('save', async function(next) {
         }
       });
       
-      // Generate unique invoice number
-      this.invoiceNumber = `INV-${dateStr}-${String(count + 1).padStart(4, '0')}`;
+      // Generate short unique invoice number: S-001, S-002, etc.
+      this.invoiceNumber = `S-${String(count + 1).padStart(3, '0')}`;
     }
     next();
   } catch (error) {

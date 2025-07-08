@@ -3,9 +3,34 @@ import Category from '../models/Category.js';
 import QRCode from 'qrcode';
 import { deleteFromCloudinary, getPublicIdFromUrl } from '../config/cloudinary.js';
 
+// Helper function to parse JSON fields from multipart form data
+const parseJSONFields = (data, fields) => {
+  const parsed = { ...data };
+  
+  fields.forEach(field => {
+    if (data[field]) {
+      try {
+        parsed[field] = JSON.parse(data[field]);
+      } catch (error) {
+        throw new Error(`Invalid ${field} format. Must be a valid JSON.`);
+      }
+    } else {
+      // Set default empty array for array fields
+      if (field === 'variations') {
+        parsed[field] = [];
+      }
+    }
+  });
+  
+  return parsed;
+};
+
 export const createProduct = async (req, res) => {
   try {
-    const product = new Product(req.body);
+    // Parse JSON fields from multipart form data
+    const productData = parseJSONFields(req.body, ['variations']);
+    
+    const product = new Product(productData);
     
     // Add uploaded image if any
     if (req.file) {
@@ -36,6 +61,14 @@ export const createProduct = async (req, res) => {
       product
     });
   } catch (error) {
+    // Handle JSON parsing errors specifically
+    if (error.message.includes('Invalid') && error.message.includes('format')) {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+    
     res.status(400).json({
       success: false,
       message: error.message

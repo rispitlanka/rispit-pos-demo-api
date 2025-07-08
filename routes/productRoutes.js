@@ -91,6 +91,9 @@ const router = express.Router();
  *                 type: boolean
  *                 default: true
  *                 description: Whether the product is active
+ *               variations:
+ *                 type: string
+ *                 description: JSON string of product variations array. Example - [{"variationId":"123","variationName":"Size","selectedValues":[{"valueId":"1","value":"Small","priceAdjustment":0}]}]
  *               image:
  *                 type: string
  *                 format: binary

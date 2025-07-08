@@ -7,7 +7,9 @@ import {
   deleteSale,
   getSalesByDateRange,
   getTopProducts,
-  getDailySummary
+  getDailySummary,
+  initInvoiceCounter,
+  getInvoiceCounterStatus
 } from '../controllers/saleController.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 
@@ -513,5 +515,63 @@ router.put('/:id', authenticate, authorize('admin'), updateSale);
  *               $ref: '#/components/schemas/Error'
  */
 router.delete('/:id', authenticate, authorize('admin'), deleteSale);
+
+/**
+ * @swagger
+ * /api/sales/admin/init-invoice-counter:
+ *   post:
+ *     summary: Initialize invoice counter (Admin only)
+ *     tags: [Sales]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Invoice counter initialized successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 currentSequence:
+ *                   type: number
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - Admin access required
+ */
+router.post('/admin/init-invoice-counter', authenticate, authorize('admin'), initInvoiceCounter);
+
+/**
+ * @swagger
+ * /api/sales/admin/invoice-counter-status:
+ *   get:
+ *     summary: Get invoice counter status (Admin only)
+ *     tags: [Sales]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Invoice counter status retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 nextInvoiceNumber:
+ *                   type: string
+ *                 totalSalesCount:
+ *                   type: number
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - Admin access required
+ */
+router.get('/admin/invoice-counter-status', authenticate, authorize('admin'), getInvoiceCounterStatus);
 
 export default router;

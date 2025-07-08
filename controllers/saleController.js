@@ -1,6 +1,7 @@
 import Sale from '../models/Sale.js';
 import Product from '../models/Product.js';
 import Customer from '../models/Customer.js';
+import { getNextInvoiceNumber, initializeCounter, previewNextInvoiceNumber } from '../utils/invoiceNumberGenerator.js';
 
 export const createSale = async (req, res) => {
   try {
@@ -39,32 +40,8 @@ export const createSale = async (req, res) => {
     // Calculate loyalty points earned
     const loyaltyPointsEarned = Math.floor(total / 100); // 1 point per 100 LKR
 
-    // Generate short invoice number with retry logic for race conditions
-    let invoiceNumber;
-    let retryCount = 0;
-    const maxRetries = 3;
-
-    while (retryCount < maxRetries) {
-      try {
-        const today = new Date();
-        const count = await Sale.countDocuments({
-          createdAt: {
-            $gte: new Date(today.getFullYear(), today.getMonth(), today.getDate()),
-            $lt: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1)
-          }
-        });
-        // Generate short format: S-001, S-002, etc.
-        invoiceNumber = `S-${String(count + 1).padStart(3, '0')}`;
-        break;
-      } catch (error) {
-        retryCount++;
-        if (retryCount >= maxRetries) {
-          throw new Error('Failed to generate invoice number after multiple attempts');
-        }
-        // Wait a bit before retrying
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-    }
+    // Generate sequential invoice number using atomic counter
+    const invoiceNumber = await getNextInvoiceNumber();
 
     // Create sale
     const sale = new Sale({
@@ -347,6 +324,44 @@ export const getDailySummary = async (req, res) => {
     res.json({
       success: true,
       summary: summary[0] || { totalSales: 0, totalOrders: 0, averageOrderValue: 0 }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+export const initInvoiceCounter = async (req, res) => {
+  try {
+    const currentSequence = await initializeCounter();
+    
+    res.json({
+      success: true,
+      message: 'Invoice counter initialized successfully',
+      currentSequence
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+export const getInvoiceCounterStatus = async (req, res) => {
+  try {
+    // Get next invoice number without incrementing (preview)
+    const nextInvoice = await previewNextInvoiceNumber();
+    
+    // Get total sales count
+    const totalSales = await Sale.countDocuments({});
+    
+    res.json({
+      success: true,
+      nextInvoiceNumber: nextInvoice,
+      totalSalesCount: totalSales
     });
   } catch (error) {
     res.status(500).json({

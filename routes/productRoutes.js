@@ -41,34 +41,56 @@ const router = express.Router();
  *             type: object
  *             required:
  *               - name
- *               - price
- *               - cost
+ *               - sku
+ *               - category
+ *               - purchasePrice
+ *               - sellingPrice
  *               - stock
  *             properties:
  *               name:
  *                 type: string
  *                 description: Product name
+ *               sku:
+ *                 type: string
+ *                 description: Product SKU (Stock Keeping Unit)
+ *               category:
+ *                 type: string
+ *                 description: Product category name
  *               description:
  *                 type: string
  *                 description: Product description
- *               price:
+ *               purchasePrice:
  *                 type: number
+ *                 minimum: 0
+ *                 description: Product purchase price
+ *               sellingPrice:
+ *                 type: number
+ *                 minimum: 0
  *                 description: Product selling price
- *               cost:
- *                 type: number
- *                 description: Product cost
  *               stock:
  *                 type: number
+ *                 minimum: 0
+ *                 default: 0
  *                 description: Current stock quantity
  *               minStock:
  *                 type: number
+ *                 default: 5
  *                 description: Minimum stock level
- *               category:
+ *               barcodeId:
  *                 type: string
- *                 description: Category ID
- *               barcode:
+ *                 description: Product barcode ID
+ *               taxRate:
+ *                 type: number
+ *                 default: 0
+ *                 description: Tax rate for the product
+ *               unit:
  *                 type: string
- *                 description: Product barcode
+ *                 default: piece
+ *                 description: Unit of measurement
+ *               isActive:
+ *                 type: boolean
+ *                 default: true
+ *                 description: Whether the product is active
  *               image:
  *                 type: string
  *                 format: binary
@@ -128,12 +150,17 @@ router.post('/', authenticate, authorize('admin'), optionalUpload.single('image'
  *           default: 10
  *         description: Items per page
  *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search in product name, SKU, or barcode
+ *       - in: query
  *         name: category
  *         schema:
  *           type: string
- *         description: Filter by category ID
+ *         description: Filter by category name
  *       - in: query
- *         name: active
+ *         name: isActive
  *         schema:
  *           type: boolean
  *         description: Filter by active status
@@ -179,11 +206,11 @@ router.get('/', authenticate, getProducts);
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
- *         name: q
+ *         name: query
  *         required: true
  *         schema:
  *           type: string
- *         description: Search query
+ *         description: Search query for product name, SKU, or barcode
  *       - in: query
  *         name: limit
  *         schema:
@@ -333,27 +360,39 @@ router.get('/:id', authenticate, getProduct);
  *               name:
  *                 type: string
  *                 description: Product name
+ *               sku:
+ *                 type: string
+ *                 description: Product SKU (Stock Keeping Unit)
+ *               category:
+ *                 type: string
+ *                 description: Product category name
  *               description:
  *                 type: string
  *                 description: Product description
- *               price:
+ *               purchasePrice:
  *                 type: number
+ *                 minimum: 0
+ *                 description: Product purchase price
+ *               sellingPrice:
+ *                 type: number
+ *                 minimum: 0
  *                 description: Product selling price
- *               cost:
- *                 type: number
- *                 description: Product cost
  *               stock:
  *                 type: number
+ *                 minimum: 0
  *                 description: Current stock quantity
  *               minStock:
  *                 type: number
  *                 description: Minimum stock level
- *               category:
+ *               barcodeId:
  *                 type: string
- *                 description: Category ID
- *               barcode:
+ *                 description: Product barcode ID
+ *               taxRate:
+ *                 type: number
+ *                 description: Tax rate for the product
+ *               unit:
  *                 type: string
- *                 description: Product barcode
+ *                 description: Unit of measurement
  *               isActive:
  *                 type: boolean
  *                 description: Whether product is active

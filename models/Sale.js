@@ -144,27 +144,10 @@ const saleSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Generate short invoice number if not provided (fallback)
-saleSchema.pre('save', async function(next) {
-  try {
-    if (!this.invoiceNumber) {
-      const today = new Date();
-      
-      // Get count of sales for today
-      const count = await this.constructor.countDocuments({
-        createdAt: {
-          $gte: new Date(today.getFullYear(), today.getMonth(), today.getDate()),
-          $lt: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1)
-        }
-      });
-      
-      // Generate short unique invoice number: S-001, S-002, etc.
-      this.invoiceNumber = `S-${String(count + 1).padStart(3, '0')}`;
-    }
-    next();
-  } catch (error) {
-    next(error);
-  }
-});
+// Index for better query performance
+saleSchema.index({ invoiceNumber: 1 });
+saleSchema.index({ createdAt: -1 });
+saleSchema.index({ customer: 1 });
+saleSchema.index({ status: 1 });
 
 export default mongoose.model('Sale', saleSchema);

@@ -1,5 +1,4 @@
 import ProductVariation from '../models/ProductVariation.js';
-import { deleteFromCloudinary, getPublicIdFromUrl } from '../config/cloudinary.js';
 
 export const createProductVariation = async (req, res) => {
   try {
@@ -17,38 +16,12 @@ export const createProductVariation = async (req, res) => {
       });
     }
 
-    // Process values and handle image uploads
-    let processedValues = [];
-    if (values && Array.isArray(values)) {
-      processedValues = values.map((value, index) => {
-        const processedValue = {
-          value: value.value,
-          priceAdjustment: value.priceAdjustment || 0,
-          sortOrder: value.sortOrder !== undefined ? value.sortOrder : index,
-          isActive: value.isActive !== undefined ? value.isActive : true
-        };
-
-        // Check for image upload for this value
-        if (req.files && req.files.length > 0) {
-          // Find the image file for this specific value index
-          const imageFile = req.files.find(file => 
-            file.fieldname === `values[${index}][image]`
-          );
-          if (imageFile) {
-            processedValue.image = imageFile.path;
-          }
-        }
-
-        return processedValue;
-      });
-    }
-
     const variation = new ProductVariation({
       name,
       description,
       type,
       isRequired,
-      values: processedValues,
+      values: values || [],
       createdBy: req.user.userId,
       createdByName: req.currentUser.fullName
     });
@@ -345,118 +318,6 @@ export const deleteVariationValue = async (req, res) => {
     res.json({
       success: true,
       message: 'Variation value deleted successfully',
-      variation
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
-};
-
-// New functions for image upload
-export const uploadVariationValueImage = async (req, res) => {
-  try {
-    const { id, valueId } = req.params;
-    
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'No file uploaded'
-      });
-    }
-    
-    const variation = await ProductVariation.findById(id);
-    if (!variation) {
-      return res.status(404).json({
-        success: false,
-        message: 'Product variation not found'
-      });
-    }
-    
-    const valueIndex = variation.values.findIndex(v => v._id.toString() === valueId);
-    if (valueIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: 'Variation value not found'
-      });
-    }
-    
-    // Delete old image from Cloudinary if exists
-    if (variation.values[valueIndex].image) {
-      try {
-        const publicId = getPublicIdFromUrl(variation.values[valueIndex].image);
-        if (publicId) {
-          await deleteFromCloudinary(publicId);
-        }
-      } catch (error) {
-        console.error('Error deleting old image from Cloudinary:', error);
-      }
-    }
-    
-    // Set new image
-    variation.values[valueIndex].image = req.file.path;
-    await variation.save();
-    
-    res.json({
-      success: true,
-      message: 'Variation value image uploaded successfully',
-      image: req.file.path,
-      variation
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
-};
-
-export const deleteVariationValueImage = async (req, res) => {
-  try {
-    const { id, valueId } = req.params;
-    
-    const variation = await ProductVariation.findById(id);
-    if (!variation) {
-      return res.status(404).json({
-        success: false,
-        message: 'Product variation not found'
-      });
-    }
-    
-    const valueIndex = variation.values.findIndex(v => v._id.toString() === valueId);
-    if (valueIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: 'Variation value not found'
-      });
-    }
-    
-    if (!variation.values[valueIndex].image) {
-      return res.status(400).json({
-        success: false,
-        message: 'No image to delete'
-      });
-    }
-    
-    // Delete from Cloudinary
-    try {
-      const publicId = getPublicIdFromUrl(variation.values[valueIndex].image);
-      if (publicId) {
-        await deleteFromCloudinary(publicId);
-      }
-    } catch (error) {
-      console.error('Error deleting image from Cloudinary:', error);
-    }
-    
-    // Remove image from variation value
-    variation.values[valueIndex].image = undefined;
-    await variation.save();
-    
-    res.json({
-      success: true,
-      message: 'Variation value image deleted successfully',
       variation
     });
   } catch (error) {

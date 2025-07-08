@@ -1,29 +1,58 @@
 import mongoose from 'mongoose';
 
-const productVariationSchema = new mongoose.Schema({
-  variationId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'ProductVariation',
-    required: true
+const variationCombinationSchema = new mongoose.Schema({
+  sku: {
+    type: String,
+    required: true,
+    unique: true,
+    trim: true
   },
-  variationName: {
+  combinationName: {
     type: String,
     required: true
   },
-  selectedValues: [{
-    valueId: {
+  variations: [{
+    variationName: {
       type: String,
       required: true
     },
-    value: {
+    selectedValue: {
       type: String,
       required: true
-    },
-    priceAdjustment: {
-      type: Number,
-      default: 0
     }
-  }]
+  }],
+  purchasePrice: {
+    type: Number,
+    min: 0
+  },
+  sellingPrice: {
+    type: Number,
+    min: 0
+  },
+  stock: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  minStock: {
+    type: Number,
+    default: 5
+  },
+  image: {
+    type: String
+  },
+  barcodeId: {
+    type: String,
+    unique: true,
+    sparse: true
+  },
+  qrCode: {
+    type: String
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  }
 });
 
 const productSchema = new mongoose.Schema({
@@ -49,17 +78,14 @@ const productSchema = new mongoose.Schema({
   },
   purchasePrice: {
     type: Number,
-    required: true,
     min: 0
   },
   sellingPrice: {
     type: Number,
-    required: true,
     min: 0
   },
   stock: {
     type: Number,
-    required: true,
     min: 0,
     default: 0
   },
@@ -75,7 +101,11 @@ const productSchema = new mongoose.Schema({
   qrCode: {
     type: String
   },
-  variations: [productVariationSchema],
+  variationCombinations: [variationCombinationSchema],
+  hasVariations: {
+    type: Boolean,
+    default: false
+  },
   image: {
     type: String
   },
@@ -95,11 +125,33 @@ const productSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Generate barcode ID if not provided
+// Generate barcode ID and SKU if not provided
 productSchema.pre('save', function(next) {
+  // Generate main product barcode ID if not provided
   if (!this.barcodeId) {
     this.barcodeId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
   }
+  
+  // Generate main product SKU if not provided
+  if (!this.sku) {
+    this.sku = 'PRD-' + Date.now().toString() + Math.random().toString(36).substr(2, 3).toUpperCase();
+  }
+  
+  // Generate SKU, barcode, and QR code for variation combinations
+  if (this.variationCombinations && this.variationCombinations.length > 0) {
+    this.variationCombinations.forEach((combination, index) => {
+      // Generate SKU for combination if not provided
+      if (!combination.sku) {
+        combination.sku = this.sku + '-V' + (index + 1);
+      }
+      
+      // Generate barcode ID for combination if not provided
+      if (!combination.barcodeId) {
+        combination.barcodeId = Date.now().toString() + Math.random().toString(36).substr(2, 5) + index;
+      }
+    });
+  }
+  
   next();
 });
 

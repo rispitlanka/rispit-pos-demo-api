@@ -68,6 +68,14 @@ const optionalUpload = {
       }
       next();
     });
+  },
+  any: () => (req, res, next) => {
+    upload.any()(req, res, (err) => {
+      if (err && err.code !== 'LIMIT_UNEXPECTED_FILE') {
+        return next(err);
+      }
+      next();
+    });
   }
 };
 

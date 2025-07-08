@@ -11,7 +11,11 @@ import {
   updateStock,
   uploadProductImage,
   deleteProductImage,
-  updateProductImage
+  updateProductImage,
+  uploadVariationValueImage,
+  deleteVariationValueImage,
+  uploadVariationCombinationImage,
+  updateVariationCombination
 } from '../controllers/productController.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { upload, optionalUpload } from '../config/cloudinary.js';
@@ -94,10 +98,25 @@ const router = express.Router();
  *               variations:
  *                 type: string
  *                 description: JSON string of product variations array. Example - [{"variationId":"123","variationName":"Size","selectedValues":[{"valueId":"1","value":"Small","priceAdjustment":0}]}]
+ *               variationCombinations:
+ *                 type: string
+ *                 description: JSON string of variation combinations array. Example - [{"variations":[{"variationName":"Size","selectedValue":"Small"},{"variationName":"Color","selectedValue":"Red"}],"purchasePrice":100,"sellingPrice":150,"stock":50,"minStock":5}]
  *               image:
  *                 type: string
  *                 format: binary
- *                 description: Product image
+ *                 description: Product main image
+ *               variationCombinations[0][image]:
+ *                 type: string
+ *                 format: binary
+ *                 description: Image for first variation combination
+ *               variationCombinations[1][image]:
+ *                 type: string
+ *                 format: binary
+ *                 description: Image for second variation combination
+ *               variationCombinations[n][image]:
+ *                 type: string
+ *                 format: binary
+ *                 description: Image for nth variation combination (pattern continues)
  *     responses:
  *       201:
  *         description: Product created successfully
@@ -129,7 +148,7 @@ const router = express.Router();
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/', authenticate, authorize('admin'), optionalUpload.single('image'), createProduct);
+router.post('/', authenticate, authorize('admin'), optionalUpload.any(), createProduct);
 
 /**
  * @swagger
@@ -695,5 +714,134 @@ router.delete('/:id/image', authenticate, authorize('admin'), deleteProductImage
  *               $ref: '#/components/schemas/Error'
  */
 router.put('/:id/image', authenticate, authorize('admin'), upload.single('image'), updateProductImage);
+
+// Variation value image routes
+/**
+ * @swagger
+ * /api/products/{id}/variations/{variationIndex}/values/{valueIndex}/image:
+ *   post:
+ *     summary: Upload variation value image
+ *     tags: [Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Product ID
+ *       - in: path
+ *         name: variationIndex
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Variation index
+ *       - in: path
+ *         name: valueIndex
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Value index
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - image
+ *             properties:
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *                 description: Variation value image
+ *     responses:
+ *       200:
+ *         description: Image uploaded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 image:
+ *                   type: string
+ *                   description: Uploaded image URL
+ *                 product:
+ *                   $ref: '#/components/schemas/Product'
+ *       401:
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       403:
+ *         description: Forbidden - Admin access required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.post('/:id/variations/:variationIndex/values/:valueIndex/image', authenticate, authorize('admin'), upload.single('image'), uploadVariationValueImage);
+
+/**
+ * @swagger
+ * /api/products/{id}/variations/{variationIndex}/values/{valueIndex}/image:
+ *   delete:
+ *     summary: Delete variation value image
+ *     tags: [Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Product ID
+ *       - in: path
+ *         name: variationIndex
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Variation index
+ *       - in: path
+ *         name: valueIndex
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Value index
+ *     responses:
+ *       200:
+ *         description: Image deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 product:
+ *                   $ref: '#/components/schemas/Product'
+ *       401:
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       403:
+ *         description: Forbidden - Admin access required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.delete('/:id/variations/:variationIndex/values/:valueIndex/image', authenticate, authorize('admin'), deleteVariationValueImage);
+
+// Variation combination routes
+router.post('/:id/combinations/:combinationIndex/image', authenticate, authorize('admin'), upload.single('image'), uploadVariationCombinationImage);
+router.put('/:id/combinations/:combinationIndex', authenticate, authorize('admin'), updateVariationCombination);
 
 export default router;

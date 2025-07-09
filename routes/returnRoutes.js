@@ -43,9 +43,32 @@ const router = express.Router();
  *               product:
  *                 type: string
  *                 description: Product ID
+ *               productName:
+ *                 type: string
+ *                 description: Product name
+ *               sku:
+ *                 type: string
+ *                 description: Product SKU
  *               quantity:
  *                 type: number
  *                 description: Quantity returned
+ *               unitPrice:
+ *                 type: number
+ *                 description: Unit price
+ *               totalPrice:
+ *                 type: number
+ *                 description: Total refund amount for this item
+ *               variationCombinationId:
+ *                 type: string
+ *                 description: Variation combination ID (for products with variations)
+ *               variations:
+ *                 type: object
+ *                 description: Variation details
+ *                 additionalProperties:
+ *                   type: string
+ *                 example:
+ *                   Color: "Red"
+ *                   Size: "Large"
  *               reason:
  *                 type: string
  *                 description: Reason for return
@@ -111,7 +134,7 @@ const router = express.Router();
  *                 items:
  *                   type: object
  *                   properties:
- *                     product:
+ *                     productId:
  *                       type: string
  *                       description: Product ID
  *                     quantity:
@@ -120,6 +143,9 @@ const router = express.Router();
  *                     reason:
  *                       type: string
  *                       description: Reason for return
+ *                     variationCombinationId:
+ *                       type: string
+ *                       description: Variation combination ID (required for products with variations)
  *                     condition:
  *                       type: string
  *                       enum: [new, used, damaged]

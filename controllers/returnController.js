@@ -23,27 +23,48 @@ export const createReturn = async (req, res) => {
 
     // Validate return items
     for (const returnItem of items) {
-      const originalItem = originalSale.items.find(
-        item => item.product.toString() === returnItem.productId
-      );
+      // Find matching item in original sale
+      const originalItem = originalSale.items.find(item => {
+        const productMatch = item.product.toString() === returnItem.productId;
+        
+        // If no variation combination, just match by product
+        if (!returnItem.variationCombinationId) {
+          return productMatch && !item.variationCombinationId;
+        }
+        
+        // If variation combination specified, match both product and combination
+        return productMatch && item.variationCombinationId === returnItem.variationCombinationId;
+      });
       
       if (!originalItem) {
         return res.status(400).json({
           success: false,
-          message: `Product not found in original sale`
+          message: `Product ${returnItem.variationCombinationId ? 'variation' : ''} not found in original sale`
         });
       }
 
       // Check if return quantity is valid
       const alreadyReturned = originalSale.returnedItems.reduce((total, returned) => {
-        const matchingReturn = returned.item.product.toString() === returnItem.productId;
-        return matchingReturn ? total + returned.item.quantity : total;
+        const productMatch = returned.item.product.toString() === returnItem.productId;
+        
+        // Match variation combination if specified
+        if (returnItem.variationCombinationId) {
+          const variationMatch = returned.item.variationCombinationId === returnItem.variationCombinationId;
+          return (productMatch && variationMatch) ? total + returned.item.quantity : total;
+        }
+        
+        // For standard products, match only by product and ensure no variation combination
+        return (productMatch && !returned.item.variationCombinationId) ? total + returned.item.quantity : total;
       }, 0);
 
       if (alreadyReturned + returnItem.quantity > originalItem.quantity) {
+        const displayName = originalItem.variationCombinationId 
+          ? `${originalItem.productName} (${Object.entries(originalItem.variations || {}).map(([k, v]) => `${k}: ${v}`).join(', ')})`
+          : originalItem.productName;
+        
         return res.status(400).json({
           success: false,
-          message: `Cannot return more than purchased quantity for ${originalItem.productName}`
+          message: `Cannot return more than purchased quantity for ${displayName}. Available: ${originalItem.quantity - alreadyReturned}, Requested: ${returnItem.quantity}`
         });
       }
     }
@@ -53,9 +74,16 @@ export const createReturn = async (req, res) => {
     let totalRefundAmount = 0;
 
     for (const returnItem of items) {
-      const originalItem = originalSale.items.find(
-        item => item.product.toString() === returnItem.productId
-      );
+      // Find matching item in original sale (same logic as validation)
+      const originalItem = originalSale.items.find(item => {
+        const productMatch = item.product.toString() === returnItem.productId;
+        
+        if (!returnItem.variationCombinationId) {
+          return productMatch && !item.variationCombinationId;
+        }
+        
+        return productMatch && item.variationCombinationId === returnItem.variationCombinationId;
+      });
 
       const refundPerUnit = originalItem.totalPrice / originalItem.quantity;
       const itemRefundAmount = refundPerUnit * returnItem.quantity;
@@ -68,17 +96,32 @@ export const createReturn = async (req, res) => {
           sku: originalItem.sku,
           quantity: returnItem.quantity,
           unitPrice: originalItem.unitPrice,
-          totalPrice: itemRefundAmount
+          totalPrice: itemRefundAmount,
+          variationCombinationId: originalItem.variationCombinationId,
+          variations: originalItem.variations
         },
         returnDate: new Date(),
         returnReason: returnItem.reason || returnReason
       });
 
       // Restore stock
-      await Product.findByIdAndUpdate(
-        returnItem.productId,
-        { $inc: { stock: returnItem.quantity } }
-      );
+      const product = await Product.findById(returnItem.productId);
+      if (product) {
+        if (returnItem.variationCombinationId) {
+          // Restore variation combination stock
+          const combination = product.variationCombinations.id(returnItem.variationCombinationId);
+          if (combination) {
+            combination.stock += returnItem.quantity;
+            await product.save();
+          }
+        } else {
+          // Restore standard product stock
+          await Product.findByIdAndUpdate(
+            returnItem.productId,
+            { $inc: { stock: returnItem.quantity } }
+          );
+        }
+      }
     }
 
     // Update original sale with returned items

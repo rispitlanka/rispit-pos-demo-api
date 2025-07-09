@@ -85,6 +85,9 @@ const router = express.Router();
  *                       type: number
  *                     rewardThreshold:
  *                       type: number
+ *                 overrideOutOfStock:
+ *                   type: boolean
+ *                   description: Allow selling products even when out of stock
  *                 createdAt:
  *                   type: string
  *                   format: date-time
@@ -163,6 +166,9 @@ router.get('/', authenticate, getSettings);
  *                     type: number
  *                   rewardThreshold:
  *                     type: number
+ *               overrideOutOfStock:
+ *                 type: boolean
+ *                 description: Allow selling products even when out of stock
  *     responses:
  *       200:
  *         description: Settings updated successfully

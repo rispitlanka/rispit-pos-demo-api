@@ -235,66 +235,96 @@ export const updateProduct = async (req, res) => {
       });
     }
 
+    // Validate request body
+    if (!req.body || typeof req.body !== 'object') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid request body'
+      });
+    }
+
     // Process variations if they exist in the request body
     let updateData = { ...req.body };
     
-    if (updateData.variations && updateData.variations.length > 0) {
-      updateData.hasVariations = true;
-      
-      // Process each variation to ensure proper structure
-      for (let i = 0; i < updateData.variations.length; i++) {
-        const variation = updateData.variations[i];
+    // Only process variations if they are explicitly provided in the request
+    if (updateData.hasOwnProperty('variations')) {
+      if (updateData.variations && updateData.variations.length > 0) {
+        updateData.hasVariations = true;
         
-        // Fetch the variation details to get the complete information
-        const variationDoc = await ProductVariation.findById(variation.variationId);
-        if (variationDoc) {
-          variation.variationName = variationDoc.name;
+        // Process each variation to ensure proper structure
+        for (let i = 0; i < updateData.variations.length; i++) {
+          const variation = updateData.variations[i];
           
-          // Process selected values
-          if (variation.selectedValues && variation.selectedValues.length > 0) {
-            for (let j = 0; j < variation.selectedValues.length; j++) {
-              const selectedValue = variation.selectedValues[j];
-              
-              // Find the value in the variation document
-              const valueDoc = variationDoc.values.id(selectedValue.valueId || selectedValue);
-              if (valueDoc) {
-                variation.selectedValues[j] = {
-                  valueId: valueDoc._id,
-                  value: valueDoc.value,
-                  priceAdjustment: valueDoc.priceAdjustment || 0
-                };
+          // Skip if variation is not properly structured
+          if (!variation || !variation.variationId) {
+            console.warn('Skipping invalid variation:', variation);
+            continue;
+          }
+          
+          // Fetch the variation details to get the complete information
+          const variationDoc = await ProductVariation.findById(variation.variationId);
+          if (variationDoc && variationDoc.name) {
+            variation.variationName = variationDoc.name;
+            
+            // Process selected values
+            if (variation.selectedValues && variation.selectedValues.length > 0) {
+              for (let j = 0; j < variation.selectedValues.length; j++) {
+                const selectedValue = variation.selectedValues[j];
+                
+                // Skip if selected value is not properly structured
+                if (!selectedValue || !selectedValue.valueId) {
+                  console.warn('Skipping invalid selected value:', selectedValue);
+                  continue;
+                }
+                
+                // Find the value in the variation document
+                const valueDoc = variationDoc.values.id(selectedValue.valueId);
+                if (valueDoc && valueDoc.value) {
+                  variation.selectedValues[j] = {
+                    valueId: valueDoc._id,
+                    value: valueDoc.value,
+                    priceAdjustment: valueDoc.priceAdjustment || 0
+                  };
+                }
               }
             }
+          } else {
+            console.warn('Variation document not found for ID:', variation.variationId);
+          }
+        }
+      } else {
+        // Empty variations array means remove all variations
+        updateData.hasVariations = false;
+      }
+    }
+    // If variations is not provided, don't modify existing variations
+
+    // Process variation combinations if they exist in the request body
+    if (updateData.hasOwnProperty('variationCombinations')) {
+      if (updateData.variationCombinations && updateData.variationCombinations.length > 0) {
+        updateData.hasVariations = true;
+        
+        // Process each variation combination
+        for (let i = 0; i < updateData.variationCombinations.length; i++) {
+          const combination = updateData.variationCombinations[i];
+          
+          // Skip if combination is not properly structured
+          if (!combination || !combination.variations) {
+            console.warn('Skipping invalid combination:', combination);
+            continue;
+          }
+          
+          // Generate combination name from variations
+          if (combination.variations && combination.variations.length > 0) {
+            combination.combinationName = combination.variations
+              .filter(v => v && v.selectedValue) // Filter out undefined values
+              .map(v => v.selectedValue)
+              .join(' / ');
           }
         }
       }
-    } else if (updateData.variations === undefined) {
-      // Don't modify variations if not provided in request
-      delete updateData.variations;
-    } else {
-      // Empty variations array means remove all variations
-      updateData.hasVariations = false;
     }
-
-    // Process variation combinations if they exist
-    if (updateData.variationCombinations && updateData.variationCombinations.length > 0) {
-      updateData.hasVariations = true;
-      
-      // Process each variation combination
-      for (let i = 0; i < updateData.variationCombinations.length; i++) {
-        const combination = updateData.variationCombinations[i];
-        
-        // Generate combination name from variations
-        if (combination.variations && combination.variations.length > 0) {
-          combination.combinationName = combination.variations
-            .map(v => v.selectedValue)
-            .join(' / ');
-        }
-      }
-    } else if (updateData.variationCombinations === undefined) {
-      // Don't modify variation combinations if not provided in request
-      delete updateData.variationCombinations;
-    }
+    // If variation combinations is not provided, don't modify existing combinations
 
     const product = await Product.findByIdAndUpdate(
       req.params.id,
@@ -330,9 +360,36 @@ export const updateProduct = async (req, res) => {
       product
     });
   } catch (error) {
+    console.error('Error updating product:', error);
+    console.error('Request body:', req.body);
+    console.error('Product ID:', req.params.id);
+    
+    // Provide more specific error messages
+    if (error.message.includes('validation failed')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed: ' + error.message
+      });
+    }
+    
+    if (error.message.includes('Cannot read properties of undefined')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid data structure provided. Please check your variation data.',
+        debug: {
+          originalError: error.message,
+          requestBody: req.body
+        }
+      });
+    }
+    
     res.status(400).json({
       success: false,
-      message: error.message
+      message: error.message || 'An error occurred while updating the product',
+      debug: process.env.NODE_ENV === 'development' ? {
+        stack: error.stack,
+        requestBody: req.body
+      } : undefined
     });
   }
 };

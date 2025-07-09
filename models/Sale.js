@@ -39,9 +39,13 @@ const saleItemSchema = new mongoose.Schema({
     required: true,
     min: 0
   },
-  variant: {
-    name: String,
-    value: String
+  variations: {
+    type: Map,
+    of: String,
+    default: {}
+  },
+  variationCombinationId: {
+    type: String
   }
 });
 

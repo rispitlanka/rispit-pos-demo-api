@@ -51,12 +51,29 @@ const router = express.Router();
  *                     product:
  *                       type: string
  *                       description: Product ID
+ *                     productName:
+ *                       type: string
+ *                       description: Product name
+ *                     sku:
+ *                       type: string
+ *                       description: Product SKU
  *                     quantity:
  *                       type: number
  *                       description: Quantity sold
- *                     price:
+ *                     unitPrice:
  *                       type: number
  *                       description: Price per unit
+ *                     totalPrice:
+ *                       type: number
+ *                       description: Total price for this item
+ *                     variationCombinationId:
+ *                       type: string
+ *                       description: Variation combination ID (optional, for products with variations)
+ *                     variations:
+ *                       type: object
+ *                       description: Variation details (e.g., {Color: "Red", Size: "Large"})
+ *                       additionalProperties:
+ *                         type: string
  *               paymentMethod:
  *                 type: string
  *                 enum: [cash, card, mobile]

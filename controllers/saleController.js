@@ -29,11 +29,31 @@ export const createSale = async (req, res) => {
         });
       }
       
-      if (product.stock < item.quantity) {
-        return res.status(400).json({
-          success: false,
-          message: `Insufficient stock for ${item.productName}`
-        });
+      // Check if item has variations
+      if (item.variationCombinationId) {
+        // Find the specific variation combination
+        const combination = product.variationCombinations.id(item.variationCombinationId);
+        if (!combination) {
+          return res.status(400).json({
+            success: false,
+            message: `Variation combination not found for ${item.productName}`
+          });
+        }
+        
+        if (combination.stock < item.quantity) {
+          return res.status(400).json({
+            success: false,
+            message: `Insufficient stock for ${item.productName} - ${combination.combinationName}`
+          });
+        }
+      } else {
+        // Standard product without variations
+        if (product.stock < item.quantity) {
+          return res.status(400).json({
+            success: false,
+            message: `Insufficient stock for ${item.productName}`
+          });
+        }
       }
     }
 
@@ -66,10 +86,20 @@ export const createSale = async (req, res) => {
 
     // Update product stock
     for (const item of items) {
-      await Product.findByIdAndUpdate(
-        item.product,
-        { $inc: { stock: -item.quantity } }
-      );
+      const product = await Product.findById(item.product);
+      
+      if (item.variationCombinationId) {
+        // Update variation combination stock
+        const combination = product.variationCombinations.id(item.variationCombinationId);
+        combination.stock -= item.quantity;
+        await product.save();
+      } else {
+        // Update standard product stock
+        await Product.findByIdAndUpdate(
+          item.product,
+          { $inc: { stock: -item.quantity } }
+        );
+      }
     }
 
     // Update customer loyalty points and purchase history
@@ -217,10 +247,22 @@ export const deleteSale = async (req, res) => {
     
     // Restore product stock
     for (const item of sale.items) {
-      await Product.findByIdAndUpdate(
-        item.product,
-        { $inc: { stock: item.quantity } }
-      );
+      const product = await Product.findById(item.product);
+      
+      if (item.variationCombinationId) {
+        // Restore variation combination stock
+        const combination = product.variationCombinations.id(item.variationCombinationId);
+        if (combination) {
+          combination.stock += item.quantity;
+          await product.save();
+        }
+      } else {
+        // Restore standard product stock
+        await Product.findByIdAndUpdate(
+          item.product,
+          { $inc: { stock: item.quantity } }
+        );
+      }
     }
     
     res.json({

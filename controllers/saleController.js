@@ -3,6 +3,30 @@ import Product from '../models/Product.js';
 import Customer from '../models/Customer.js';
 import { getNextInvoiceNumber, initializeCounter, previewNextInvoiceNumber } from '../utils/invoiceNumberGenerator.js';
 
+// Helper function to format variation display
+export const formatVariationDisplay = (item) => {
+  if (item.variations && item.variations.size > 0) {
+    const variationParts = [];
+    for (const [key, value] of item.variations) {
+      variationParts.push(`${key}: ${value}`);
+    }
+    return `${item.productName} - ${variationParts.join(', ')}`;
+  }
+  return item.productName;
+};
+
+// Helper function to enhance sale items with formatted display names
+export const enhanceSaleItems = (sale) => {
+  return {
+    ...sale.toObject(),
+    items: sale.items.map(item => ({
+      ...item.toObject(),
+      displayName: formatVariationDisplay(item),
+      hasVariations: !!(item.variationCombinationId && item.variations)
+    }))
+  };
+};
+
 export const createSale = async (req, res) => {
   try {
     const {
@@ -161,11 +185,14 @@ export const getSales = async (req, res) => {
       .skip((page - 1) * limit)
       .sort({ createdAt: -1 });
     
+    // Enhance sales with variation display information
+    const enhancedSales = sales.map(sale => enhanceSaleItems(sale));
+    
     const total = await Sale.countDocuments(query);
     
     res.json({
       success: true,
-      sales,
+      sales: enhancedSales,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -196,7 +223,7 @@ export const getSale = async (req, res) => {
     
     res.json({
       success: true,
-      sale
+      sale: enhanceSaleItems(sale)
     });
   } catch (error) {
     res.status(500).json({
@@ -224,7 +251,7 @@ export const updateSale = async (req, res) => {
     res.json({
       success: true,
       message: 'Sale updated successfully',
-      sale
+      sale: enhanceSaleItems(sale)
     });
   } catch (error) {
     res.status(400).json({
@@ -294,9 +321,12 @@ export const getSalesByDateRange = async (req, res) => {
       .populate('customer', 'name phone')
       .sort({ createdAt: -1 });
     
+    // Enhance sales with variation display information
+    const enhancedSales = sales.map(sale => enhanceSaleItems(sale));
+    
     res.json({
       success: true,
-      sales
+      sales: enhancedSales
     });
   } catch (error) {
     res.status(500).json({
@@ -314,14 +344,61 @@ export const getTopProducts = async (req, res) => {
       { $unwind: '$items' },
       {
         $group: {
-          _id: '$items.product',
+          _id: {
+            product: '$items.product',
+            variationCombinationId: '$items.variationCombinationId'
+          },
           productName: { $first: '$items.productName' },
+          variations: { $first: '$items.variations' },
           totalQuantity: { $sum: '$items.quantity' },
           totalRevenue: { $sum: '$items.totalPrice' }
         }
       },
       { $sort: { totalQuantity: -1 } },
-      { $limit: parseInt(limit) }
+      { $limit: parseInt(limit) },
+      {
+        $project: {
+          _id: 0,
+          productId: '$_id.product',
+          variationCombinationId: '$_id.variationCombinationId',
+          productName: 1,
+          variations: 1,
+          totalQuantity: 1,
+          totalRevenue: 1,
+          displayName: {
+            $cond: {
+              if: { $ifNull: ['$variations', false] },
+              then: {
+                $concat: [
+                  '$productName',
+                  ' - ',
+                  { $reduce: {
+                    input: { $objectToArray: '$variations' },
+                    initialValue: '',
+                    in: {
+                      $concat: [
+                        '$$value',
+                        { $cond: { if: { $eq: ['$$value', ''] }, then: '', else: ', ' } },
+                        '$$this.k',
+                        ': ',
+                        '$$this.v'
+                      ]
+                    }
+                  }}
+                ]
+              },
+              else: '$productName'
+            }
+          },
+          hasVariations: {
+            $cond: {
+              if: { $ifNull: ['$variationCombinationId', false] },
+              then: true,
+              else: false
+            }
+          }
+        }
+      }
     ]);
     
     res.json({

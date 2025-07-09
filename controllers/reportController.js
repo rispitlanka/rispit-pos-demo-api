@@ -3,6 +3,29 @@ import Product from '../models/Product.js';
 import Customer from '../models/Customer.js';
 import Expense from '../models/Expense.js';
 
+// Helper function to format variation display in aggregations
+const formatVariationDisplayInAggregation = (productName, variations) => {
+  if (variations && Object.keys(variations).length > 0) {
+    const variationParts = Object.entries(variations).map(([key, value]) => `${key}: ${value}`);
+    return `${productName} - ${variationParts.join(', ')}`;
+  }
+  return productName;
+};
+
+// Helper function to enhance sale items with formatted display names
+const enhanceSaleItems = (sale) => {
+  return {
+    ...sale.toObject(),
+    items: sale.items.map(item => ({
+      ...item.toObject(),
+      displayName: item.variations && item.variations.size > 0 
+        ? `${item.productName} - ${Array.from(item.variations.entries()).map(([key, value]) => `${key}: ${value}`).join(', ')}`
+        : item.productName,
+      hasVariations: !!(item.variationCombinationId && item.variations)
+    }))
+  };
+};
+
 export const getSalesReport = async (req, res) => {
   try {
     const { startDate, endDate, groupBy = 'day' } = req.query;
@@ -400,22 +423,72 @@ export const getDashboardStats = async (req, res) => {
       { $unwind: '$items' },
       {
         $group: {
-          _id: '$items.product',
+          _id: {
+            product: '$items.product',
+            variationCombinationId: '$items.variationCombinationId'
+          },
           productName: { $first: '$items.productName' },
+          variations: { $first: '$items.variations' },
           totalQuantity: { $sum: '$items.quantity' },
           totalRevenue: { $sum: '$items.totalPrice' }
         }
       },
       { $sort: { totalQuantity: -1 } },
-      { $limit: 5 }
+      { $limit: 5 },
+      {
+        $project: {
+          _id: 0,
+          productId: '$_id.product',
+          variationCombinationId: '$_id.variationCombinationId',
+          productName: 1,
+          variations: 1,
+          totalQuantity: 1,
+          totalRevenue: 1,
+          displayName: {
+            $cond: {
+              if: { $ifNull: ['$variations', false] },
+              then: {
+                $concat: [
+                  '$productName',
+                  ' - ',
+                  { $reduce: {
+                    input: { $objectToArray: '$variations' },
+                    initialValue: '',
+                    in: {
+                      $concat: [
+                        '$$value',
+                        { $cond: { if: { $eq: ['$$value', ''] }, then: '', else: ', ' } },
+                        '$$this.k',
+                        ': ',
+                        '$$this.v'
+                      ]
+                    }
+                  }}
+                ]
+              },
+              else: '$productName'
+            }
+          },
+          hasVariations: {
+            $cond: {
+              if: { $ifNull: ['$variationCombinationId', false] },
+              then: true,
+              else: false
+            }
+          }
+        }
+      }
     ]);
     
     // Recent sales
-    const recentSales = await Sale.find()
+    const recentSalesRaw = await Sale.find()
       .populate('customer', 'name phone')
       .sort({ createdAt: -1 })
       .limit(10)
-      .select('invoiceNumber total customerInfo cashierName createdAt');
+      .select('invoiceNumber total customerInfo cashierName createdAt items');
+    
+    // Enhance recent sales with variation display information
+    const recentSales = recentSalesRaw.map(sale => enhanceSaleItems(sale));
     
     // Returns today
     const todayReturns = await Sale.aggregate([

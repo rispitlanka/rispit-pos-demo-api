@@ -27,6 +27,54 @@ export const enhanceSaleItems = (sale) => {
   };
 };
 
+// Helper function to enhance sale items with detailed variation information
+export const enhanceSaleItemsWithVariationDetails = async (sale) => {
+  const saleObj = sale.toObject();
+  
+  // Process each item to add detailed variation information
+  const enhancedItems = await Promise.all(
+    saleObj.items.map(async (item) => {
+      const enhancedItem = {
+        ...item,
+        displayName: formatVariationDisplay(item),
+        hasVariations: !!(item.variationCombinationId && item.variations)
+      };
+
+      // If item has variations, fetch detailed variation information from Product
+      if (item.variationCombinationId && item.product) {
+        try {
+          const product = await Product.findById(item.product);
+          if (product) {
+            const combination = product.variationCombinations.id(item.variationCombinationId);
+            if (combination) {
+              enhancedItem.variationDetails = {
+                combinationId: combination._id,
+                combinationName: combination.combinationName,
+                sku: combination.sku,
+                price: combination.price,
+                stock: combination.stock,
+                isActive: combination.isActive,
+                variations: Object.fromEntries(item.variations || new Map()),
+                variationTypes: product.variationTypes || []
+              };
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching variation details:', error);
+          // Continue without variation details if there's an error
+        }
+      }
+
+      return enhancedItem;
+    })
+  );
+
+  return {
+    ...saleObj,
+    items: enhancedItems
+  };
+};
+
 export const createSale = async (req, res) => {
   try {
     const {
@@ -220,10 +268,13 @@ export const getSale = async (req, res) => {
         message: 'Sale not found'
       });
     }
+
+    // Enhance sale items with detailed variation information
+    const enhancedSale = await enhanceSaleItemsWithVariationDetails(sale);
     
     res.json({
       success: true,
-      sale: enhanceSaleItems(sale)
+      sale: enhancedSale
     });
   } catch (error) {
     res.status(500).json({

@@ -71,7 +71,7 @@ const router = express.Router();
  *                       description: Variation combination ID (optional, for products with variations)
  *                     variations:
  *                       type: object
- *                       description: Variation details (e.g., {Color: "Red", Size: "Large"})
+ *                       description: 'Variation details (e.g., {"Color": "Red", "Size": "Large"})'
  *                       additionalProperties:
  *                         type: string
  *               paymentMethod:

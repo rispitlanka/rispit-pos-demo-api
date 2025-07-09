@@ -69,6 +69,10 @@ const settingsSchema = new mongoose.Schema({
       type: Boolean,
       default: false
     }
+  },
+  overrideOutOfStock: {
+    type: Boolean,
+    default: false
   }
 }, {
   timestamps: true

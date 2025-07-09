@@ -475,6 +475,56 @@ router.get('/:id', authenticate, getProduct);
  *               isActive:
  *                 type: boolean
  *                 description: Whether product is active
+ *               variations:
+ *                 type: array
+ *                 description: Product variations array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     variationId:
+ *                       type: string
+ *                       description: Variation ID
+ *                     variationName:
+ *                       type: string
+ *                       description: Variation name
+ *                     selectedValues:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           valueId:
+ *                             type: string
+ *                             description: Value ID
+ *                           value:
+ *                             type: string
+ *                             description: Value name
+ *                           priceAdjustment:
+ *                             type: number
+ *                             description: Price adjustment for this value
+ *               variationCombinations:
+ *                 type: array
+ *                 description: Product variation combinations array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     variations:
+ *                       type: array
+ *                       description: Combination variations
+ *                     purchasePrice:
+ *                       type: number
+ *                       description: Combination purchase price
+ *                     sellingPrice:
+ *                       type: number
+ *                       description: Combination selling price
+ *                     stock:
+ *                       type: number
+ *                       description: Combination stock
+ *                     minStock:
+ *                       type: number
+ *                       description: Combination minimum stock
+ *                     isActive:
+ *                       type: boolean
+ *                       description: Whether combination is active
  *     responses:
  *       200:
  *         description: Product updated successfully

@@ -235,9 +235,70 @@ export const updateProduct = async (req, res) => {
       });
     }
 
+    // Process variations if they exist in the request body
+    let updateData = { ...req.body };
+    
+    if (updateData.variations && updateData.variations.length > 0) {
+      updateData.hasVariations = true;
+      
+      // Process each variation to ensure proper structure
+      for (let i = 0; i < updateData.variations.length; i++) {
+        const variation = updateData.variations[i];
+        
+        // Fetch the variation details to get the complete information
+        const variationDoc = await ProductVariation.findById(variation.variationId);
+        if (variationDoc) {
+          variation.variationName = variationDoc.name;
+          
+          // Process selected values
+          if (variation.selectedValues && variation.selectedValues.length > 0) {
+            for (let j = 0; j < variation.selectedValues.length; j++) {
+              const selectedValue = variation.selectedValues[j];
+              
+              // Find the value in the variation document
+              const valueDoc = variationDoc.values.id(selectedValue.valueId || selectedValue);
+              if (valueDoc) {
+                variation.selectedValues[j] = {
+                  valueId: valueDoc._id,
+                  value: valueDoc.value,
+                  priceAdjustment: valueDoc.priceAdjustment || 0
+                };
+              }
+            }
+          }
+        }
+      }
+    } else if (updateData.variations === undefined) {
+      // Don't modify variations if not provided in request
+      delete updateData.variations;
+    } else {
+      // Empty variations array means remove all variations
+      updateData.hasVariations = false;
+    }
+
+    // Process variation combinations if they exist
+    if (updateData.variationCombinations && updateData.variationCombinations.length > 0) {
+      updateData.hasVariations = true;
+      
+      // Process each variation combination
+      for (let i = 0; i < updateData.variationCombinations.length; i++) {
+        const combination = updateData.variationCombinations[i];
+        
+        // Generate combination name from variations
+        if (combination.variations && combination.variations.length > 0) {
+          combination.combinationName = combination.variations
+            .map(v => v.selectedValue)
+            .join(' / ');
+        }
+      }
+    } else if (updateData.variationCombinations === undefined) {
+      // Don't modify variation combinations if not provided in request
+      delete updateData.variationCombinations;
+    }
+
     const product = await Product.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      updateData,
       { new: true, runValidators: true }
     );
     

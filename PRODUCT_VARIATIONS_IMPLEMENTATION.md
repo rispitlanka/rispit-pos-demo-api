@@ -75,6 +75,13 @@ POST /api/products
 
 When creating a product with variations, include the `variations` field in the request body:
 
+### 3. Update Product with Variations
+```
+PUT /api/products/{id}
+```
+
+When updating a product, you can modify variations by including the `variations` field in the request body. The variations will be processed and validated similar to product creation.
+
 **Request Body Example:**
 ```json
 {
@@ -130,6 +137,49 @@ When creating a product with variations, include the `variations` field in the r
   ]
 }
 ```
+
+**Update Product Request Body Example:**
+```json
+{
+  "name": "Updated Cotton T-Shirt",
+  "sellingPrice": 1200,
+  "variations": [
+    {
+      "variationId": "64e4b1c2f1a2b3c4d5e6f7a8",
+      "variationName": "Color",
+      "selectedValues": [
+        {
+          "valueId": "64e4b1c2f1a2b3c4d5e6f7a9"
+        },
+        {
+          "valueId": "64e4b1c2f1a2b3c4d5e6f7aa"
+        }
+      ]
+    }
+  ],
+  "variationCombinations": [
+    {
+      "variations": [
+        {
+          "variationName": "Color",
+          "selectedValue": "Red"
+        }
+      ],
+      "purchasePrice": 550,
+      "sellingPrice": 1200,
+      "stock": 30,
+      "minStock": 5
+    }
+  ]
+}
+```
+
+**Notes for Updating Products:**
+- If `variations` is not provided in the request, existing variations will remain unchanged
+- If `variations` is provided as an empty array `[]`, all variations will be removed
+- If `variations` is provided with data, the existing variations will be replaced with the new ones
+- The same logic applies to `variationCombinations`
+- When variations are updated, the `hasVariations` flag is automatically set based on whether variations exist
 
 ## Frontend Implementation
 

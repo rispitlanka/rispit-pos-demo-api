@@ -56,9 +56,20 @@ export const createProduct = async (req, res) => {
             for (let j = 0; j < variation.selectedValues.length; j++) {
               const selectedValue = variation.selectedValues[j];
               
+              // Handle both string IDs and object format
+              let valueId;
+              if (typeof selectedValue === 'string') {
+                valueId = selectedValue;
+              } else if (selectedValue && selectedValue.valueId) {
+                valueId = selectedValue.valueId;
+              } else {
+                console.warn('Skipping invalid selected value:', selectedValue);
+                continue;
+              }
+              
               // Find the value in the variation document
-              const valueDoc = variationDoc.values.id(selectedValue.valueId || selectedValue);
-              if (valueDoc) {
+              const valueDoc = variationDoc.values.id(valueId);
+              if (valueDoc && valueDoc.value) {
                 variation.selectedValues[j] = {
                   valueId: valueDoc._id,
                   value: valueDoc.value,
@@ -265,29 +276,33 @@ export const updateProduct = async (req, res) => {
           const variationDoc = await ProductVariation.findById(variation.variationId);
           if (variationDoc && variationDoc.name) {
             variation.variationName = variationDoc.name;
-            
-            // Process selected values
-            if (variation.selectedValues && variation.selectedValues.length > 0) {
-              for (let j = 0; j < variation.selectedValues.length; j++) {
-                const selectedValue = variation.selectedValues[j];
-                
-                // Skip if selected value is not properly structured
-                if (!selectedValue || !selectedValue.valueId) {
-                  console.warn('Skipping invalid selected value:', selectedValue);
-                  continue;
-                }
-                
-                // Find the value in the variation document
-                const valueDoc = variationDoc.values.id(selectedValue.valueId);
-                if (valueDoc && valueDoc.value) {
-                  variation.selectedValues[j] = {
-                    valueId: valueDoc._id,
-                    value: valueDoc.value,
-                    priceAdjustment: valueDoc.priceAdjustment || 0
-                  };
-                }
+               // Process selected values
+          if (variation.selectedValues && variation.selectedValues.length > 0) {
+            for (let j = 0; j < variation.selectedValues.length; j++) {
+              const selectedValue = variation.selectedValues[j];
+              
+              // Handle both string IDs and object format
+              let valueId;
+              if (typeof selectedValue === 'string') {
+                valueId = selectedValue;
+              } else if (selectedValue && selectedValue.valueId) {
+                valueId = selectedValue.valueId;
+              } else {
+                console.warn('Skipping invalid selected value:', selectedValue);
+                continue;
+              }
+              
+              // Find the value in the variation document
+              const valueDoc = variationDoc.values.id(valueId);
+              if (valueDoc && valueDoc.value) {
+                variation.selectedValues[j] = {
+                  valueId: valueDoc._id,
+                  value: valueDoc.value,
+                  priceAdjustment: valueDoc.priceAdjustment || 0
+                };
               }
             }
+          }
           } else {
             console.warn('Variation document not found for ID:', variation.variationId);
           }

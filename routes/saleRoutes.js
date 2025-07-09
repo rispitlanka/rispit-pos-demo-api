@@ -38,7 +38,8 @@ const router = express.Router();
  *             type: object
  *             required:
  *               - items
- *               - paymentMethod
+ *               - total
+ *               - payments
  *             properties:
  *               customer:
  *                 type: string
@@ -71,19 +72,52 @@ const router = express.Router();
  *                       description: Variation combination ID (optional, for products with variations)
  *                     variations:
  *                       type: object
- *                       description: Variation details (e.g., {Color: "Red", Size: "Large"})
+ *                       description: 'Variation details (e.g., Color: Red, Size: Large)'
  *                       additionalProperties:
  *                         type: string
- *               paymentMethod:
- *                 type: string
- *                 enum: [cash, card, mobile]
- *                 description: Payment method
+ *               customerInfo:
+ *                 type: object
+ *                 properties:
+ *                   name:
+ *                     type: string
+ *                   phone:
+ *                     type: string
+ *                   email:
+ *                     type: string
+ *               subtotal:
+ *                 type: number
+ *                 description: Subtotal amount
  *               discount:
  *                 type: number
  *                 description: Discount amount
+ *               discountType:
+ *                 type: string
+ *                 enum: [fixed, percentage]
+ *                 description: Discount type
  *               tax:
  *                 type: number
  *                 description: Tax amount
+ *               loyaltyPointsUsed:
+ *                 type: number
+ *                 description: Loyalty points used
+ *               total:
+ *                 type: number
+ *                 description: Total amount
+ *               payments:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     method:
+ *                       type: string
+ *                       enum: [cash, card, bank_transfer]
+ *                     amount:
+ *                       type: number
+ *                     reference:
+ *                       type: string
+ *               notes:
+ *                 type: string
+ *                 description: Additional notes
  *     responses:
  *       201:
  *         description: Sale created successfully
@@ -432,22 +466,72 @@ router.get('/:id', authenticate, getSale);
  *                     product:
  *                       type: string
  *                       description: Product ID
+ *                     productName:
+ *                       type: string
+ *                       description: Product name
+ *                     sku:
+ *                       type: string
+ *                       description: Product SKU
  *                     quantity:
  *                       type: number
  *                       description: Quantity sold
- *                     price:
+ *                     unitPrice:
  *                       type: number
  *                       description: Price per unit
- *               paymentMethod:
- *                 type: string
- *                 enum: [cash, card, mobile]
- *                 description: Payment method
+ *                     totalPrice:
+ *                       type: number
+ *                       description: Total price for this item
+ *                     variationCombinationId:
+ *                       type: string
+ *                       description: Variation combination ID (optional, for products with variations)
+ *                     variations:
+ *                       type: object
+ *                       description: 'Variation details (e.g., Color: Red, Size: Large)'
+ *                       additionalProperties:
+ *                         type: string
+ *               customerInfo:
+ *                 type: object
+ *                 properties:
+ *                   name:
+ *                     type: string
+ *                   phone:
+ *                     type: string
+ *                   email:
+ *                     type: string
+ *               subtotal:
+ *                 type: number
+ *                 description: Subtotal amount
  *               discount:
  *                 type: number
  *                 description: Discount amount
+ *               discountType:
+ *                 type: string
+ *                 enum: [fixed, percentage]
+ *                 description: Discount type
  *               tax:
  *                 type: number
  *                 description: Tax amount
+ *               loyaltyPointsUsed:
+ *                 type: number
+ *                 description: Loyalty points used
+ *               total:
+ *                 type: number
+ *                 description: Total amount
+ *               payments:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     method:
+ *                       type: string
+ *                       enum: [cash, card, bank_transfer]
+ *                     amount:
+ *                       type: number
+ *                     reference:
+ *                       type: string
+ *               notes:
+ *                 type: string
+ *                 description: Additional notes
  *     responses:
  *       200:
  *         description: Sale updated successfully
@@ -590,5 +674,122 @@ router.post('/admin/init-invoice-counter', authenticate, authorize('admin'), ini
  *         description: Forbidden - Admin access required
  */
 router.get('/admin/invoice-counter-status', authenticate, authorize('admin'), getInvoiceCounterStatus);
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     Sale:
+ *       type: object
+ *       properties:
+ *         _id:
+ *           type: string
+ *           description: Sale ID
+ *         invoiceNumber:
+ *           type: string
+ *           description: Invoice number
+ *         items:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/SaleItem'
+ *         customer:
+ *           type: string
+ *           description: Customer ID
+ *         customerInfo:
+ *           type: object
+ *           properties:
+ *             name:
+ *               type: string
+ *             phone:
+ *               type: string
+ *             email:
+ *               type: string
+ *         subtotal:
+ *           type: number
+ *         discount:
+ *           type: number
+ *         discountType:
+ *           type: string
+ *           enum: [fixed, percentage]
+ *         tax:
+ *           type: number
+ *         loyaltyPointsUsed:
+ *           type: number
+ *         loyaltyPointsEarned:
+ *           type: number
+ *         total:
+ *           type: number
+ *         payments:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/Payment'
+ *         status:
+ *           type: string
+ *           enum: [completed, partial, refunded]
+ *         cashier:
+ *           type: string
+ *           description: Cashier ID
+ *         cashierName:
+ *           type: string
+ *         notes:
+ *           type: string
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *     SaleItem:
+ *       type: object
+ *       properties:
+ *         product:
+ *           type: string
+ *           description: Product ID
+ *         productName:
+ *           type: string
+ *         sku:
+ *           type: string
+ *         quantity:
+ *           type: number
+ *         unitPrice:
+ *           type: number
+ *         discount:
+ *           type: number
+ *         discountType:
+ *           type: string
+ *           enum: [fixed, percentage]
+ *         totalPrice:
+ *           type: number
+ *         variationCombinationId:
+ *           type: string
+ *           description: Variation combination ID (optional)
+ *         variations:
+ *           type: object
+ *           description: Variation details
+ *           additionalProperties:
+ *             type: string
+ *           example:
+ *             Color: "Red"
+ *             Size: "Large"
+ *     Payment:
+ *       type: object
+ *       properties:
+ *         method:
+ *           type: string
+ *           enum: [cash, card, bank_transfer]
+ *         amount:
+ *           type: number
+ *         reference:
+ *           type: string
+ *     Error:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           example: false
+ *         message:
+ *           type: string
+ *           example: "Error message"
+ */
 
 export default router;

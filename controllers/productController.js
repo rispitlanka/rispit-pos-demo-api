@@ -1,5 +1,6 @@
 import Product from '../models/Product.js';
 import Category from '../models/Category.js';
+import ProductVariation from '../models/ProductVariation.js';
 import QRCode from 'qrcode';
 import { deleteFromCloudinary, getPublicIdFromUrl } from '../config/cloudinary.js';
 
@@ -36,6 +37,39 @@ export const createProduct = async (req, res) => {
     if (req.files && req.files['image']) {
       product.image = req.files['image'][0].path;
     }
+
+    // Process variations if they exist
+    if (product.variations && product.variations.length > 0) {
+      product.hasVariations = true;
+      
+      // Process each variation to ensure proper structure
+      for (let i = 0; i < product.variations.length; i++) {
+        const variation = product.variations[i];
+        
+        // Fetch the variation details to get the complete information
+        const variationDoc = await ProductVariation.findById(variation.variationId);
+        if (variationDoc) {
+          variation.variationName = variationDoc.name;
+          
+          // Process selected values
+          if (variation.selectedValues && variation.selectedValues.length > 0) {
+            for (let j = 0; j < variation.selectedValues.length; j++) {
+              const selectedValue = variation.selectedValues[j];
+              
+              // Find the value in the variation document
+              const valueDoc = variationDoc.values.id(selectedValue.valueId || selectedValue);
+              if (valueDoc) {
+                variation.selectedValues[j] = {
+                  valueId: valueDoc._id,
+                  value: valueDoc.value,
+                  priceAdjustment: valueDoc.priceAdjustment || 0
+                };
+              }
+            }
+          }
+        }
+      }
+    }
     
     // Process variation combinations and handle images
     if (product.variationCombinations && product.variationCombinations.length > 0) {
@@ -63,14 +97,14 @@ export const createProduct = async (req, res) => {
     }
     
     // Generate QR code for main product
-    const qrCodeData = JSON.stringify({
+    const mainQrCodeData = JSON.stringify({
       id: product._id,
       name: product.name,
       sku: product.sku || 'PRD-' + Date.now(),
       hasVariations: product.hasVariations
     });
     
-    product.qrCode = await QRCode.toDataURL(qrCodeData);
+    product.qrCode = await QRCode.toDataURL(mainQrCodeData);
     
     // Save product first to get the ID and generate SKUs
     await product.save();
@@ -209,14 +243,14 @@ export const updateProduct = async (req, res) => {
     
     // Update QR code if name, SKU, or price changed
     if (req.body.name || req.body.sku || req.body.sellingPrice) {
-      const qrCodeData = JSON.stringify({
+      const updateQrCodeData = JSON.stringify({
         id: product._id,
         name: product.name,
         sku: product.sku,
         price: product.sellingPrice
       });
       
-      product.qrCode = await QRCode.toDataURL(qrCodeData);
+      product.qrCode = await QRCode.toDataURL(updateQrCodeData);
       await product.save();
     }
 
@@ -595,136 +629,6 @@ export const updateProductImage = async (req, res) => {
   }
 };
 
-export const uploadVariationValueImage = async (req, res) => {
-  try {
-    const { id, variationIndex, valueIndex } = req.params;
-    
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'No file uploaded'
-      });
-    }
-    
-    const product = await Product.findById(id);
-    if (!product) {
-      return res.status(404).json({
-        success: false,
-        message: 'Product not found'
-      });
-    }
-    
-    // Check if variation exists
-    if (!product.variations[variationIndex]) {
-      return res.status(404).json({
-        success: false,
-        message: 'Variation not found'
-      });
-    }
-    
-    // Check if selected value exists
-    if (!product.variations[variationIndex].selectedValues[valueIndex]) {
-      return res.status(404).json({
-        success: false,
-        message: 'Selected value not found'
-      });
-    }
-    
-    // Delete old image from Cloudinary if exists
-    const selectedValue = product.variations[variationIndex].selectedValues[valueIndex];
-    if (selectedValue.image) {
-      try {
-        const publicId = getPublicIdFromUrl(selectedValue.image);
-        if (publicId) {
-          await deleteFromCloudinary(publicId);
-        }
-      } catch (error) {
-        console.error('Error deleting old image from Cloudinary:', error);
-      }
-    }
-    
-    // Set new image
-    selectedValue.image = req.file.path;
-    await product.save();
-    
-    res.json({
-      success: true,
-      message: 'Variation value image uploaded successfully',
-      image: req.file.path,
-      product
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
-};
-
-export const deleteVariationValueImage = async (req, res) => {
-  try {
-    const { id, variationIndex, valueIndex } = req.params;
-    
-    const product = await Product.findById(id);
-    if (!product) {
-      return res.status(404).json({
-        success: false,
-        message: 'Product not found'
-      });
-    }
-    
-    // Check if variation exists
-    if (!product.variations[variationIndex]) {
-      return res.status(404).json({
-        success: false,
-        message: 'Variation not found'
-      });
-    }
-    
-    // Check if selected value exists
-    if (!product.variations[variationIndex].selectedValues[valueIndex]) {
-      return res.status(404).json({
-        success: false,
-        message: 'Selected value not found'
-      });
-    }
-    
-    const selectedValue = product.variations[variationIndex].selectedValues[valueIndex];
-    
-    if (!selectedValue.image) {
-      return res.status(400).json({
-        success: false,
-        message: 'No image to delete'
-      });
-    }
-    
-    // Delete from Cloudinary
-    try {
-      const publicId = getPublicIdFromUrl(selectedValue.image);
-      if (publicId) {
-        await deleteFromCloudinary(publicId);
-      }
-    } catch (error) {
-      console.error('Error deleting image from Cloudinary:', error);
-    }
-    
-    // Remove image from selected value
-    selectedValue.image = undefined;
-    await product.save();
-    
-    res.json({
-      success: true,
-      message: 'Variation value image deleted successfully',
-      product
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
-};
-
 export const uploadVariationCombinationImage = async (req, res) => {
   try {
     const { id, combinationIndex } = req.params;
@@ -835,6 +739,24 @@ export const updateVariationCombination = async (req, res) => {
     });
   } catch (error) {
     res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+export const getActiveVariations = async (req, res) => {
+  try {
+    const variations = await ProductVariation.find({ isActive: true })
+      .sort({ sortOrder: 1, name: 1 })
+      .select('name description type isRequired values');
+    
+    res.json({
+      success: true,
+      variations
+    });
+  } catch (error) {
+    res.status(500).json({
       success: false,
       message: error.message
     });

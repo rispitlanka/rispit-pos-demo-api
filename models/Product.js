@@ -101,6 +101,31 @@ const productSchema = new mongoose.Schema({
   qrCode: {
     type: String
   },
+  variations: [{
+    variationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'ProductVariation',
+      required: true
+    },
+    variationName: {
+      type: String,
+      required: true
+    },
+    selectedValues: [{
+      valueId: {
+        type: mongoose.Schema.Types.ObjectId,
+        required: true
+      },
+      value: {
+        type: String,
+        required: true
+      },
+      priceAdjustment: {
+        type: Number,
+        default: 0
+      }
+    }]
+  }],
   variationCombinations: [variationCombinationSchema],
   hasVariations: {
     type: Boolean,

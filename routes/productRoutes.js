@@ -12,10 +12,9 @@ import {
   uploadProductImage,
   deleteProductImage,
   updateProductImage,
-  uploadVariationValueImage,
-  deleteVariationValueImage,
   uploadVariationCombinationImage,
-  updateVariationCombination
+  updateVariationCombination,
+  getActiveVariations
 } from '../controllers/productController.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { upload, optionalUpload } from '../config/cloudinary.js';
@@ -97,7 +96,7 @@ const router = express.Router();
  *                 description: Whether the product is active
  *               variations:
  *                 type: string
- *                 description: JSON string of product variations array. Example - [{"variationId":"123","variationName":"Size","selectedValues":[{"valueId":"1","value":"Small","priceAdjustment":0}]}]
+ *                 description: JSON string of product variations array. Example - [{"variationId":"64e4b1c2f1a2b3c4d5e6f7a8","variationName":"Color","selectedValues":[{"valueId":"64e4b1c2f1a2b3c4d5e6f7a8","value":"Red","priceAdjustment":100}]}]
  *               variationCombinations:
  *                 type: string
  *                 description: JSON string of variation combinations array. Example - [{"variations":[{"variationName":"Size","selectedValue":"Small"},{"variationName":"Color","selectedValue":"Red"}],"purchasePrice":100,"sellingPrice":150,"stock":50,"minStock":5}]
@@ -282,6 +281,64 @@ router.get('/search', authenticate, searchProducts);
  *               $ref: '#/components/schemas/Error'
  */
 router.get('/categories', authenticate, getCategories);
+
+/**
+ * @swagger
+ * /api/products/variations:
+ *   get:
+ *     summary: Get all active variations
+ *     tags: [Products]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Active variations retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 variations:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       _id:
+ *                         type: string
+ *                       name:
+ *                         type: string
+ *                       description:
+ *                         type: string
+ *                       type:
+ *                         type: string
+ *                         enum: [single, multiple]
+ *                       isRequired:
+ *                         type: boolean
+ *                       values:
+ *                         type: array
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             _id:
+ *                               type: string
+ *                             value:
+ *                               type: string
+ *                             priceAdjustment:
+ *                               type: number
+ *                             isActive:
+ *                               type: boolean
+ *                             sortOrder:
+ *                               type: number
+ *       401:
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.get('/variations', authenticate, getActiveVariations);
 
 /**
  * @swagger
@@ -784,7 +841,6 @@ router.put('/:id/image', authenticate, authorize('admin'), upload.single('image'
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/:id/variations/:variationIndex/values/:valueIndex/image', authenticate, authorize('admin'), upload.single('image'), uploadVariationValueImage);
 
 /**
  * @swagger
@@ -838,8 +894,6 @@ router.post('/:id/variations/:variationIndex/values/:valueIndex/image', authenti
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.delete('/:id/variations/:variationIndex/values/:valueIndex/image', authenticate, authorize('admin'), deleteVariationValueImage);
-
 // Variation combination routes
 router.post('/:id/combinations/:combinationIndex/image', authenticate, authorize('admin'), upload.single('image'), uploadVariationCombinationImage);
 router.put('/:id/combinations/:combinationIndex', authenticate, authorize('admin'), updateVariationCombination);

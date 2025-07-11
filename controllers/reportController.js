@@ -2,6 +2,7 @@ import Sale from '../models/Sale.js';
 import Product from '../models/Product.js';
 import Customer from '../models/Customer.js';
 import Expense from '../models/Expense.js';
+import { enhanceSaleItemsWithVariationDetails } from './saleController.js';
 
 // Helper function to format variation display in aggregations
 const formatVariationDisplayInAggregation = (productName, variations) => {
@@ -487,8 +488,10 @@ export const getDashboardStats = async (req, res) => {
       .limit(10)
       .select('invoiceNumber total customerInfo cashierName createdAt items');
     
-    // Enhance recent sales with variation display information
-    const recentSales = recentSalesRaw.map(sale => enhanceSaleItems(sale));
+    // Enhance recent sales with detailed variation information
+    const recentSales = await Promise.all(
+      recentSalesRaw.map(sale => enhanceSaleItemsWithVariationDetails(sale))
+    );
     
     // Returns today
     const todayReturns = await Sale.aggregate([

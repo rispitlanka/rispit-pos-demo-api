@@ -226,16 +226,17 @@ export const getSales = async (req, res) => {
     if (customer) {
       query.customer = customer;
     }
-    
-    const sales = await Sale.find(query)
+     const sales = await Sale.find(query)
       .populate('customer', 'name phone email')
       .limit(limit * 1)
       .skip((page - 1) * limit)
       .sort({ createdAt: -1 });
-    
-    // Enhance sales with variation display information
-    const enhancedSales = sales.map(sale => enhanceSaleItems(sale));
-    
+
+    // Enhance sales with detailed variation information
+    const enhancedSales = await Promise.all(
+      sales.map(sale => enhanceSaleItemsWithVariationDetails(sale))
+    );
+
     const total = await Sale.countDocuments(query);
     
     res.json({
@@ -372,8 +373,10 @@ export const getSalesByDateRange = async (req, res) => {
       .populate('customer', 'name phone')
       .sort({ createdAt: -1 });
     
-    // Enhance sales with variation display information
-    const enhancedSales = sales.map(sale => enhanceSaleItems(sale));
+    // Enhance sales with detailed variation information
+    const enhancedSales = await Promise.all(
+      sales.map(sale => enhanceSaleItemsWithVariationDetails(sale))
+    );
     
     res.json({
       success: true,

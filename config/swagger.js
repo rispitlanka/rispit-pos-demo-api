@@ -653,6 +653,10 @@ const options = {
                     type: 'string',
                     description: 'Product ID'
                   },
+                  productName: {
+                    type: 'string',
+                    description: 'Product name'
+                  },
                   quantity: {
                     type: 'number',
                     description: 'Quantity returned'
@@ -669,6 +673,82 @@ const options = {
                   refundAmount: {
                     type: 'number',
                     description: 'Refund amount for this item'
+                  },
+                  variationCombinationId: {
+                    type: 'string',
+                    description: 'Variation combination ID (optional)'
+                  },
+                  variations: {
+                    type: 'object',
+                    description: 'Variation details',
+                    additionalProperties: {
+                      type: 'string'
+                    }
+                  },
+                  displayName: {
+                    type: 'string',
+                    description: 'Formatted display name with variations'
+                  },
+                  hasVariations: {
+                    type: 'boolean',
+                    description: 'Whether this item has variations'
+                  },
+                  variationDetails: {
+                    type: 'object',
+                    description: 'Detailed variation information',
+                    properties: {
+                      combinationId: {
+                        type: 'string',
+                        description: 'Variation combination ID'
+                      },
+                      combinationName: {
+                        type: 'string',
+                        description: 'Variation combination name'
+                      },
+                      sku: {
+                        type: 'string',
+                        description: 'SKU for this variation'
+                      },
+                      price: {
+                        type: 'number',
+                        description: 'Price for this variation'
+                      },
+                      stock: {
+                        type: 'number',
+                        description: 'Current stock for this variation'
+                      },
+                      isActive: {
+                        type: 'boolean',
+                        description: 'Whether this variation is active'
+                      },
+                      variations: {
+                        type: 'object',
+                        description: 'Variation key-value pairs',
+                        additionalProperties: {
+                          type: 'string'
+                        }
+                      },
+                      variationTypes: {
+                        type: 'array',
+                        description: 'Available variation types for the product',
+                        items: {
+                          type: 'object',
+                          properties: {
+                            name: {
+                              type: 'string',
+                              description: 'Variation type name'
+                            },
+                            values: {
+                              type: 'array',
+                              items: {
+                                type: 'string'
+                              },
+                              description: 'Available values for this variation type'
+                            }
+                          }
+                        }
+                      }
+                    }
                   }
                 }
               }

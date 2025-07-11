@@ -1,6 +1,7 @@
 import Sale from '../models/Sale.js';
 import Product from '../models/Product.js';
 import Customer from '../models/Customer.js';
+import { formatVariationDisplay } from './saleController.js';
 
 export const createReturn = async (req, res) => {
   try {
@@ -193,11 +194,16 @@ export const getReturns = async (req, res) => {
       .skip((page - 1) * limit)
       .sort({ createdAt: -1 });
     
+    // Enhance returns with detailed variation information
+    const enhancedReturns = await Promise.all(
+      returns.map(returnSale => enhanceReturnItemsWithVariationDetails(returnSale))
+    );
+    
     const total = await Sale.countDocuments(matchQuery);
     
     res.json({
       success: true,
-      returns,
+      returns: enhancedReturns,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -226,9 +232,12 @@ export const getReturnDetails = async (req, res) => {
       });
     }
     
+    // Enhance return with detailed variation information
+    const enhancedReturn = await enhanceReturnItemsWithVariationDetails(sale);
+    
     res.json({
       success: true,
-      return: sale
+      return: enhancedReturn
     });
   } catch (error) {
     res.status(500).json({
@@ -266,18 +275,67 @@ export const getReturnSummary = async (req, res) => {
       }
     ]);
     
+    // Enhanced product returns aggregation with variation support
     const productReturns = await Sale.aggregate([
       { $match: matchQuery },
       { $unwind: '$returnedItems' },
       {
         $group: {
-          _id: '$returnedItems.item.productName',
+          _id: {
+            product: '$returnedItems.item.product',
+            variationCombinationId: '$returnedItems.item.variationCombinationId'
+          },
+          productName: { $first: '$returnedItems.item.productName' },
+          variations: { $first: '$returnedItems.item.variations' },
           returnCount: { $sum: '$returnedItems.item.quantity' },
           refundAmount: { $sum: '$returnedItems.item.totalPrice' }
         }
       },
       { $sort: { returnCount: -1 } },
-      { $limit: 10 }
+      { $limit: 10 },
+      {
+        $project: {
+          _id: 0,
+          productId: '$_id.product',
+          variationCombinationId: '$_id.variationCombinationId',
+          productName: 1,
+          variations: 1,
+          returnCount: 1,
+          refundAmount: 1,
+          displayName: {
+            $cond: {
+              if: { $ifNull: ['$variations', false] },
+              then: {
+                $concat: [
+                  '$productName',
+                  ' - ',
+                  { $reduce: {
+                    input: { $objectToArray: '$variations' },
+                    initialValue: '',
+                    in: {
+                      $concat: [
+                        '$$value',
+                        { $cond: { if: { $eq: ['$$value', ''] }, then: '', else: ', ' } },
+                        '$$this.k',
+                        ': ',
+                        '$$this.v'
+                      ]
+                    }
+                  }}
+                ]
+              },
+              else: '$productName'
+            }
+          },
+          hasVariations: {
+            $cond: {
+              if: { $ifNull: ['$variationCombinationId', false] },
+              then: true,
+              else: false
+            }
+          }
+        }
+      }
     ]);
     
     res.json({
@@ -291,4 +349,92 @@ export const getReturnSummary = async (req, res) => {
       message: error.message
     });
   }
+};
+
+// Helper function to enhance return items with detailed variation information
+export const enhanceReturnItemsWithVariationDetails = async (sale) => {
+  const saleObj = sale.toObject();
+  
+  // Process original sale items to add variation details
+  const enhancedItems = await Promise.all(
+    saleObj.items.map(async (item) => {
+      const enhancedItem = {
+        ...item,
+        displayName: formatVariationDisplay(item),
+        hasVariations: !!(item.variationCombinationId && item.variations)
+      };
+
+      // If item has variations, fetch detailed variation information from Product
+      if (item.variationCombinationId && item.product) {
+        try {
+          const product = await Product.findById(item.product);
+          if (product) {
+            const combination = product.variationCombinations.id(item.variationCombinationId);
+            if (combination) {
+              enhancedItem.variationDetails = {
+                combinationId: combination._id,
+                combinationName: combination.combinationName,
+                sku: combination.sku,
+                price: combination.price,
+                stock: combination.stock,
+                isActive: combination.isActive,
+                variations: Object.fromEntries(item.variations || new Map()),
+                variationTypes: product.variationTypes || []
+              };
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching variation details for return item:', error);
+        }
+      }
+
+      return enhancedItem;
+    })
+  );
+
+  // Process returned items to add variation details
+  const enhancedReturnedItems = await Promise.all(
+    (saleObj.returnedItems || []).map(async (returnedItem) => {
+      const enhancedReturnItem = {
+        ...returnedItem,
+        item: {
+          ...returnedItem.item,
+          displayName: formatVariationDisplay(returnedItem.item),
+          hasVariations: !!(returnedItem.item.variationCombinationId && returnedItem.item.variations)
+        }
+      };
+
+      // If returned item has variations, fetch detailed variation information
+      if (returnedItem.item.variationCombinationId && returnedItem.item.product) {
+        try {
+          const product = await Product.findById(returnedItem.item.product);
+          if (product) {
+            const combination = product.variationCombinations.id(returnedItem.item.variationCombinationId);
+            if (combination) {
+              enhancedReturnItem.item.variationDetails = {
+                combinationId: combination._id,
+                combinationName: combination.combinationName,
+                sku: combination.sku,
+                price: combination.price,
+                stock: combination.stock,
+                isActive: combination.isActive,
+                variations: Object.fromEntries(returnedItem.item.variations || new Map()),
+                variationTypes: product.variationTypes || []
+              };
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching variation details for returned item:', error);
+        }
+      }
+
+      return enhancedReturnItem;
+    })
+  );
+
+  return {
+    ...saleObj,
+    items: enhancedItems,
+    returnedItems: enhancedReturnedItems
+  };
 };

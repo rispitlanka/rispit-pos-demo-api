@@ -7,7 +7,7 @@ export const createReturn = async (req, res) => {
   try {
     const {
       saleId,
-      items, // Array of { productId, quantity, reason }
+      items, // Array of { productId, variationCombinationId, quantity, reason, condition }
       returnReason,
       refundAmount,
       refundMethod // 'cash', 'card', 'bank_transfer'
@@ -38,9 +38,10 @@ export const createReturn = async (req, res) => {
       });
       
       if (!originalItem) {
+        const variationText = returnItem.variationCombinationId ? ' with specified variation' : '';
         return res.status(400).json({
           success: false,
-          message: `Product ${returnItem.variationCombinationId ? 'variation' : ''} not found in original sale`
+          message: `Product${variationText} not found in original sale`
         });
       }
 
@@ -59,14 +60,33 @@ export const createReturn = async (req, res) => {
       }, 0);
 
       if (alreadyReturned + returnItem.quantity > originalItem.quantity) {
-        const displayName = originalItem.variationCombinationId 
-          ? `${originalItem.productName} (${Object.entries(originalItem.variations || {}).map(([k, v]) => `${k}: ${v}`).join(', ')})`
-          : originalItem.productName;
+        // Create display name for better error messaging
+        const displayName = formatVariationDisplay(originalItem);
         
         return res.status(400).json({
           success: false,
           message: `Cannot return more than purchased quantity for ${displayName}. Available: ${originalItem.quantity - alreadyReturned}, Requested: ${returnItem.quantity}`
         });
+      }
+
+      // Validate that the product and variation combination still exist and are valid
+      const product = await Product.findById(returnItem.productId);
+      if (!product) {
+        return res.status(400).json({
+          success: false,
+          message: `Product not found: ${returnItem.productId}`
+        });
+      }
+
+      // If variation combination specified, validate it exists
+      if (returnItem.variationCombinationId) {
+        const combination = product.variationCombinations.id(returnItem.variationCombinationId);
+        if (!combination) {
+          return res.status(400).json({
+            success: false,
+            message: `Variation combination not found: ${returnItem.variationCombinationId}`
+          });
+        }
       }
     }
 
@@ -90,7 +110,8 @@ export const createReturn = async (req, res) => {
       const itemRefundAmount = refundPerUnit * returnItem.quantity;
       totalRefundAmount += itemRefundAmount;
 
-      returnedItems.push({
+      // Create return item with proper variation details
+      const returnItemData = {
         item: {
           product: returnItem.productId,
           productName: originalItem.productName,
@@ -102,10 +123,16 @@ export const createReturn = async (req, res) => {
           variations: originalItem.variations
         },
         returnDate: new Date(),
-        returnReason: returnItem.reason || returnReason
-      });
+        returnReason: returnItem.reason || returnReason,
+        condition: returnItem.condition || 'used',
+        processedBy: req.currentUser?.fullName || 'System',
+        refundAmount: itemRefundAmount,
+        refundMethod: refundMethod
+      };
 
-      // Restore stock
+      returnedItems.push(returnItemData);
+
+      // Restore stock to the appropriate location
       const product = await Product.findById(returnItem.productId);
       if (product) {
         if (returnItem.variationCombinationId) {
@@ -114,6 +141,10 @@ export const createReturn = async (req, res) => {
           if (combination) {
             combination.stock += returnItem.quantity;
             await product.save();
+            
+            console.log(`Restored ${returnItem.quantity} units to variation ${combination.combinationName} (${combination.sku}). New stock: ${combination.stock}`);
+          } else {
+            console.error(`Variation combination not found for restoration: ${returnItem.variationCombinationId}`);
           }
         } else {
           // Restore standard product stock
@@ -121,7 +152,11 @@ export const createReturn = async (req, res) => {
             returnItem.productId,
             { $inc: { stock: returnItem.quantity } }
           );
+          
+          console.log(`Restored ${returnItem.quantity} units to standard product ${product.name}. New stock: ${product.stock + returnItem.quantity}`);
         }
+      } else {
+        console.error(`Product not found for stock restoration: ${returnItem.productId}`);
       }
     }
 
@@ -152,19 +187,23 @@ export const createReturn = async (req, res) => {
       }
     }
 
+    // Enhanced response with variation details
+    const enhancedReturn = await enhanceReturnItemsWithVariationDetails(originalSale);
+
     res.status(201).json({
       success: true,
       message: 'Return processed successfully',
       return: {
         saleId,
-        returnedItems,
+        returnedItems: enhancedReturn.returnedItems,
         totalRefundAmount,
         refundMethod,
-        processedBy: req.currentUser.fullName,
+        processedBy: req.currentUser?.fullName || 'System',
         processedAt: new Date()
       }
     });
   } catch (error) {
+    console.error('Error processing return:', error);
     res.status(400).json({
       success: false,
       message: error.message

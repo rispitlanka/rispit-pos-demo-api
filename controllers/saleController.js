@@ -1,6 +1,7 @@
 import Sale from '../models/Sale.js';
 import Product from '../models/Product.js';
 import Customer from '../models/Customer.js';
+import Settings from '../models/Settings.js';
 import { getNextInvoiceNumber, initializeCounter, previewNextInvoiceNumber } from '../utils/invoiceNumberGenerator.js';
 
 // Helper function to format variation display
@@ -91,40 +92,68 @@ export const createSale = async (req, res) => {
       notes
     } = req.body;
 
-    // Validate stock availability
-    for (const item of items) {
-      const product = await Product.findById(item.product);
-      if (!product) {
-        return res.status(400).json({
-          success: false,
-          message: `Product ${item.productName} not found`
-        });
-      }
-      
-      // Check if item has variations
-      if (item.variationCombinationId) {
-        // Find the specific variation combination
-        const combination = product.variationCombinations.id(item.variationCombinationId);
-        if (!combination) {
+    // Get settings to check if out of stock override is enabled
+    const settings = await Settings.findOne({});
+    const overrideOutOfStock = settings?.overrideOutOfStock || false;
+
+    // Validate stock availability (unless override is enabled)
+    if (!overrideOutOfStock) {
+      for (const item of items) {
+        const product = await Product.findById(item.product);
+        if (!product) {
           return res.status(400).json({
             success: false,
-            message: `Variation combination not found for ${item.productName}`
+            message: `Product ${item.productName} not found`
           });
         }
         
-        if (combination.stock < item.quantity) {
+        // Check if item has variations
+        if (item.variationCombinationId) {
+          // Find the specific variation combination
+          const combination = product.variationCombinations.id(item.variationCombinationId);
+          if (!combination) {
+            return res.status(400).json({
+              success: false,
+              message: `Variation combination not found for ${item.productName}`
+            });
+          }
+          
+          if (combination.stock < item.quantity) {
+            return res.status(400).json({
+              success: false,
+              message: `Insufficient stock for ${item.productName} - ${combination.combinationName}`
+            });
+          }
+        } else {
+          // Standard product without variations
+          if (product.stock < item.quantity) {
+            return res.status(400).json({
+              success: false,
+              message: `Insufficient stock for ${item.productName}`
+            });
+          }
+        }
+      }
+    } else {
+      // When override is enabled, just validate that products exist
+      for (const item of items) {
+        const product = await Product.findById(item.product);
+        if (!product) {
           return res.status(400).json({
             success: false,
-            message: `Insufficient stock for ${item.productName} - ${combination.combinationName}`
+            message: `Product ${item.productName} not found`
           });
         }
-      } else {
-        // Standard product without variations
-        if (product.stock < item.quantity) {
-          return res.status(400).json({
-            success: false,
-            message: `Insufficient stock for ${item.productName}`
-          });
+        
+        // Check if variation combination exists for variation items
+        if (item.variationCombinationId) {
+          const combination = product.variationCombinations.id(item.variationCombinationId);
+          if (!combination) {
+            return res.status(400).json({
+              success: false,
+              message: `Variation combination not found for ${item.productName}`
+            });
+          }
         }
       }
     }

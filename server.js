@@ -23,6 +23,8 @@ import settingsRoutes from './routes/settingsRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import returnRoutes from './routes/returnRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
+import purchaseOrderRoutes from './routes/purchaseOrderRoutes.js';
+import supplierRoutes from './routes/supplierRoutes.js';
 
 dotenv.config();
 
@@ -71,6 +73,8 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/returns', returnRoutes);
 app.use('/api/uploads', uploadRoutes);
+app.use('/api/purchase-orders', purchaseOrderRoutes);
+app.use('/api/suppliers', supplierRoutes);
 
 // Welcome endpoint - no auth required
 /**

@@ -37,7 +37,10 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: ['http://localhost:3000', 'https://rispit-pos-api.onrender.com','http://localhost:5173'],
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -112,6 +115,8 @@ app.get('/', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log("https://localhost:3000")
+  console.log("https://rispit-pos-api.onrender.com")
   
   // Start cron job to hit root route every 14 minutes
   cron.schedule('*/14 * * * *', async () => {

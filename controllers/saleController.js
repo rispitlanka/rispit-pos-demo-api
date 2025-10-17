@@ -96,7 +96,7 @@ export const createSale = async (req, res) => {
     const settings = await Settings.findOne({});
     const overrideOutOfStock = settings?.overrideOutOfStock || false;
 
-    // Validate stock availability (unless override is enabled)
+    // Validate stock availability (unless override is enabled or quantity is negative)
     if (!overrideOutOfStock) {
       for (const item of items) {
         const product = await Product.findById(item.product);
@@ -105,6 +105,21 @@ export const createSale = async (req, res) => {
             success: false,
             message: `Product ${item.productName} not found`
           });
+        }
+        
+        // Skip stock validation for negative quantities (returns/adjustments)
+        if (item.quantity < 0) {
+          // For negative quantities, just verify the product/variation exists
+          if (item.variationCombinationId) {
+            const combination = product.variationCombinations.id(item.variationCombinationId);
+            if (!combination) {
+              return res.status(400).json({
+                success: false,
+                message: `Variation combination not found for ${item.productName}`
+              });
+            }
+          }
+          continue; // Skip stock check for returns
         }
         
         // Check if item has variations
@@ -186,19 +201,20 @@ export const createSale = async (req, res) => {
     await sale.save();
 
     // Update product stock
+    // Note: Negative quantities will ADD stock back (returns/adjustments)
     for (const item of items) {
       const product = await Product.findById(item.product);
       
       if (item.variationCombinationId) {
         // Update variation combination stock
         const combination = product.variationCombinations.id(item.variationCombinationId);
-        combination.stock -= item.quantity;
+        combination.stock -= item.quantity; // Negative quantity will add stock back
         await product.save();
       } else {
         // Update standard product stock
         await Product.findByIdAndUpdate(
           item.product,
-          { $inc: { stock: -item.quantity } }
+          { $inc: { stock: -item.quantity } } // Negative quantity will add stock back
         );
       }
     }

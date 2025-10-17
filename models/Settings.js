@@ -73,6 +73,10 @@ const settingsSchema = new mongoose.Schema({
   overrideOutOfStock: {
     type: Boolean,
     default: false
+  },
+  enablePOSReturns:{
+    type: Boolean,
+    default: false
   }
 }, {
   timestamps: true

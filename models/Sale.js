@@ -16,8 +16,8 @@ const saleItemSchema = new mongoose.Schema({
   },
   quantity: {
     type: Number,
-    required: true,
-    min: 1
+    required: true
+    // Removed min validation to allow negative quantities (for returns/stock adjustments)
   },
   unitPrice: {
     type: Number,
@@ -36,8 +36,8 @@ const saleItemSchema = new mongoose.Schema({
   },
   totalPrice: {
     type: Number,
-    required: true,
-    min: 0
+    required: true
+    // Removed min validation to allow negative totalPrice (for returns/stock adjustments)
   },
   variations: {
     type: Map,

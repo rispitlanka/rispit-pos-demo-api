@@ -493,8 +493,8 @@ export const getDashboardStats = async (req, res) => {
       recentSalesRaw.map(sale => enhanceSaleItemsWithVariationDetails(sale))
     );
     
-    // Returns today
-    const todayReturns = await Sale.aggregate([
+    // Returns today from returnedItems field
+    const todayReturnsFromReturnedItems = await Sale.aggregate([
       {
         $match: {
           returnedItems: { $exists: true, $not: { $size: 0 } },
@@ -516,13 +516,54 @@ export const getDashboardStats = async (req, res) => {
       }
     ]);
     
+    // Returns today from negative quantity sales (created today)
+    const todayReturnsFromNegativeQty = await Sale.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: startOfDay, $lt: endOfDay }
+        }
+      },
+      { $unwind: '$items' },
+      {
+        $match: {
+          'items.quantity': { $lt: 0 }
+        }
+      },
+      {
+        $group: {
+          _id: '$_id', // Group by sale ID to count transactions
+          totalRefundAmount: { 
+            $sum: { 
+              $abs: '$items.totalPrice' // Use absolute value of totalPrice
+            } 
+          }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalReturns: { $sum: 1 }, // Count number of transactions
+          totalRefundAmount: { $sum: '$totalRefundAmount' } // Sum all refund amounts
+        }
+      }
+    ]);
+    
+    // Combine both return sources
+    const combinedReturns = {
+      totalReturns: (todayReturnsFromReturnedItems[0]?.totalReturns || 0) + 
+                    (todayReturnsFromNegativeQty[0]?.totalReturns || 0),
+      totalRefundAmount: (todayReturnsFromReturnedItems[0]?.totalRefundAmount || 0) + 
+                         (todayReturnsFromNegativeQty[0]?.totalRefundAmount || 0)
+    };
+    
     res.json({
       success: true,
       stats: {
         today: {
           ...(todaySales[0] || { totalSales: 0, totalOrders: 0 }),
           expenses: todayExpenses[0]?.totalExpenses || 0,
-          returns: todayReturns[0]?.totalRefundAmount || 0,
+          returns: combinedReturns.totalRefundAmount,
+          returnCount: combinedReturns.totalReturns,
           cashInRegister
         },
         month: monthSales[0] || { totalSales: 0, totalOrders: 0 },

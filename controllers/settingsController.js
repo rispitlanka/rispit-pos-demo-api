@@ -25,6 +25,28 @@ export const getSettings = async (req, res) => {
 
 export const updateSettings = async (req, res) => {
   try {
+    // Validate commission payload if present
+    if (req.body && typeof req.body.commission !== 'undefined') {
+      const commission = req.body.commission || {};
+
+      if (typeof commission.enabled !== 'undefined' && typeof commission.enabled !== 'boolean') {
+        return res.status(400).json({ success: false, message: 'commission.enabled must be a boolean' });
+      }
+
+      if (typeof commission.type !== 'undefined' && !['percentage', 'fixed'].includes(commission.type)) {
+        return res.status(400).json({ success: false, message: "Invalid commission type. Must be 'percentage' or 'fixed'." });
+      }
+
+      if (typeof commission.value !== 'undefined') {
+        const valueNum = Number(commission.value);
+        if (Number.isNaN(valueNum) || valueNum < 0) {
+          return res.status(400).json({ success: false, message: 'Commission value must be a non-negative number.' });
+        }
+        // Normalize numeric type
+        req.body.commission.value = valueNum;
+      }
+    }
+
     let settings = await Settings.findOne();
     
     if (!settings) {

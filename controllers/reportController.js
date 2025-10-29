@@ -3,6 +3,8 @@ import Product from '../models/Product.js';
 import Customer from '../models/Customer.js';
 import Expense from '../models/Expense.js';
 import { enhanceSaleItemsWithVariationDetails } from './saleController.js';
+import User from '../models/User.js';
+import mongoose from 'mongoose';
 
 // Helper function to format variation display in aggregations
 const formatVariationDisplayInAggregation = (productName, variations) => {
@@ -579,5 +581,96 @@ export const getDashboardStats = async (req, res) => {
       success: false,
       message: error.message
     });
+  }
+};
+
+export const getStaffCommissionsReport = async (req, res) => {
+  try {
+    const { month, cashier, startDate, endDate, format } = req.query;
+
+    // Determine date range using Asia/Colombo
+    const offsetMinutes = 330; // +05:30
+    let rangeStart = null;
+    let rangeEnd = null;
+
+    if (month) {
+      const [y, m] = month.split('-').map(Number);
+      if (!y || !m || m < 1 || m > 12) {
+        return res.status(400).json({ success: false, message: 'Invalid month. Use YYYY-MM.' });
+      }
+      const startColombo = new Date(y, m - 1, 1, 0, 0, 0, 0);
+      const endColombo = new Date(y, m, 1, 0, 0, 0, 0);
+      rangeStart = new Date(startColombo.getTime() - offsetMinutes * 60 * 1000);
+      rangeEnd = new Date(endColombo.getTime() - offsetMinutes * 60 * 1000);
+    } else if (startDate && endDate) {
+      rangeStart = new Date(startDate);
+      rangeEnd = new Date(endDate);
+    } else {
+      // Default to current month
+      const nowColombo = new Date(Date.now() + offsetMinutes * 60 * 1000);
+      const startColombo = new Date(nowColombo.getFullYear(), nowColombo.getMonth(), 1, 0, 0, 0, 0);
+      const endColombo = new Date(nowColombo.getFullYear(), nowColombo.getMonth() + 1, 1, 0, 0, 0, 0);
+      rangeStart = new Date(startColombo.getTime() - offsetMinutes * 60 * 1000);
+      rangeEnd = new Date(endColombo.getTime() - offsetMinutes * 60 * 1000);
+    }
+
+    const match = { status: 'completed', createdAt: { $gte: rangeStart, $lt: rangeEnd } };
+    if (cashier && cashier !== 'me') {
+      if (typeof cashier === 'string' && cashier.length === 24) {
+        match.cashier = new mongoose.Types.ObjectId(cashier);
+      } else {
+        match.cashier = cashier; // fallback
+      }
+    }
+
+    const detailSales = await Sale.find(match)
+      .populate('cashier', 'fullName username')
+      .sort({ createdAt: 1 })
+      .select('invoiceNumber total createdAt cashier cashierName commissionAmount');
+
+    const summaryAgg = await Sale.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: '$cashier',
+          commissionTotal: { $sum: '$commissionAmount' },
+          salesCount: { $sum: 1 }
+        }
+      },
+      { $sort: { commissionTotal: -1 } }
+    ]);
+
+    // Populate user info for summary
+    const cashierIds = summaryAgg.map(r => r._id).filter(Boolean);
+    const users = await User.find({ _id: { $in: cashierIds } }).select('fullName username');
+    const byId = new Map(users.map(u => [String(u._id), u]));
+    const summary = summaryAgg.map(r => ({
+      cashierId: r._id,
+      fullName: byId.get(String(r._id))?.fullName || 'Unknown',
+      username: byId.get(String(r._id))?.username || '',
+      commissionTotal: r.commissionTotal || 0,
+      salesCount: r.salesCount || 0
+    }));
+
+    if (format === 'csv') {
+      const lines = ['invoiceNumber,date,cashierName,total,commissionAmount'];
+      for (const s of detailSales) {
+        lines.push([
+          s.invoiceNumber,
+          new Date(s.createdAt).toISOString(),
+          JSON.stringify(s.cashierName || s.cashier?.fullName || ''),
+          s.total,
+          s.commissionAmount
+        ].join(','));
+      }
+      const csv = lines.join('\n');
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="staff_commissions.csv"');
+      return res.send(csv);
+    }
+
+    res.json({ success: true, summary, sales: detailSales });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };

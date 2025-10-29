@@ -2,6 +2,7 @@ import Sale from '../models/Sale.js';
 import Product from '../models/Product.js';
 import Customer from '../models/Customer.js';
 import Settings from '../models/Settings.js';
+import User from '../models/User.js';
 import { getNextInvoiceNumber, initializeCounter, previewNextInvoiceNumber } from '../utils/invoiceNumberGenerator.js';
 
 // Helper function to format variation display
@@ -89,7 +90,8 @@ export const createSale = async (req, res) => {
       loyaltyPointsUsed,
       total,
       payments,
-      notes
+      notes,
+      cashier: selectedCashier
     } = req.body;
 
     // Get settings to check if out of stock override is enabled
@@ -173,11 +175,41 @@ export const createSale = async (req, res) => {
       }
     }
 
+    // Enforce cashier selection if commission feature is enabled
+    const commissionConfig = settings?.commission || { enabled: false };
+    let cashierUser = null;
+    if (commissionConfig.enabled) {
+      if (!selectedCashier) {
+        return res.status(400).json({ success: false, message: 'Select cashier' });
+      }
+      cashierUser = await User.findById(selectedCashier);
+      if (!cashierUser || !cashierUser.isActive || !['admin', 'cashier'].includes(cashierUser.role)) {
+        return res.status(400).json({ success: false, message: 'Invalid cashier selected' });
+      }
+    } else {
+      // Fallback to logged-in user when feature is disabled
+      cashierUser = req.currentUser;
+    }
+
     // Calculate loyalty points earned
     const loyaltyPointsEarned = Math.floor(total / 100); // 1 point per 100 LKR
 
     // Generate sequential invoice number using atomic counter
     const invoiceNumber = await getNextInvoiceNumber();
+
+    // Compute commission amount (only when enabled and status is completed)
+    // Status defaults to 'completed' in schema when not provided
+    let commissionAmount = 0;
+    if (commissionConfig.enabled) {
+      if (commissionConfig.type === 'percentage') {
+        commissionAmount = (Number(commissionConfig.value || 0) / 100) * Number(total || 0);
+      } else if (commissionConfig.type === 'fixed') {
+        commissionAmount = Number(commissionConfig.value || 0);
+      }
+      // Round once to 2 decimals, standard half-up
+      commissionAmount = Math.round(commissionAmount * 100) / 100;
+      if (commissionAmount < 0) commissionAmount = 0;
+    }
 
     // Create sale
     const sale = new Sale({
@@ -193,9 +225,10 @@ export const createSale = async (req, res) => {
       loyaltyPointsEarned,
       total,
       payments,
-      cashier: req.user.userId,
-      cashierName: req.currentUser.fullName,
-      notes
+      cashier: cashierUser._id,
+      cashierName: cashierUser.fullName,
+      notes,
+      commissionAmount
     });
 
     await sale.save();
@@ -332,6 +365,13 @@ export const getSale = async (req, res) => {
 
 export const updateSale = async (req, res) => {
   try {
+    // Prevent updating cashier and commissionAmount via this endpoint
+    if (req.body) {
+      delete req.body.cashier;
+      delete req.body.cashierName;
+      delete req.body.commissionAmount;
+    }
+
     const sale = await Sale.findByIdAndUpdate(
       req.params.id,
       req.body,

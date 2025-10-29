@@ -77,6 +77,22 @@ const settingsSchema = new mongoose.Schema({
   enablePOSReturns:{
     type: Boolean,
     default: false
+  },
+  commission: {
+    enabled: {
+      type: Boolean,
+      default: false
+    },
+    type: {
+      type: String,
+      enum: ['percentage', 'fixed'],
+      default: 'percentage'
+    },
+    value: {
+      type: Number,
+      default: 0,
+      min: 0
+    }
   }
 }, {
   timestamps: true

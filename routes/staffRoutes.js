@@ -5,7 +5,8 @@ import {
   getStaffMember,
   updateStaff,
   deleteStaff,
-  updateStaffStatus
+  updateStaffStatus,
+  getMyCommission
 } from '../controllers/staffController.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 
@@ -15,7 +16,7 @@ const router = express.Router();
  * @swagger
  * tags:
  *   name: Staff
- *   description: Staff management endpoints (Admin only)
+ *   description: Staff management endpoints (Admin-only except where noted)
  */
 
 /**
@@ -122,7 +123,7 @@ router.post('/', authenticate, authorize('admin'), createStaff);
  * @swagger
  * /api/staff:
  *   get:
- *     summary: Get all staff members
+ *     summary: Get all staff members (Admin and Cashier)
  *     tags: [Staff]
  *     security:
  *       - bearerAuth: []
@@ -191,7 +192,7 @@ router.post('/', authenticate, authorize('admin'), createStaff);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.get('/', authenticate, authorize('admin'), getStaff);
+router.get('/', authenticate, authorize('admin', 'cashier'), getStaff);
 
 /**
  * @swagger
@@ -444,5 +445,8 @@ router.patch('/:id/status', authenticate, authorize('admin'), updateStaffStatus)
  *               $ref: '#/components/schemas/Error'
  */
 router.delete('/:id', authenticate, authorize('admin'), deleteStaff);
+
+// Staff self commission (cashier or admin can view their own)
+router.get('/me/commission', authenticate, getMyCommission);
 
 export default router;

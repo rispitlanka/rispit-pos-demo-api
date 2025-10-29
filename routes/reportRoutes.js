@@ -4,7 +4,8 @@ import {
   getInventoryReport,
   getCustomerReport,
   getExpenseReport,
-  getDashboardStats
+  getDashboardStats,
+  getStaffCommissionsReport
 } from '../controllers/reportController.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 
@@ -468,5 +469,8 @@ router.get('/expenses', authenticate, getExpenseReport);
  *               $ref: '#/components/schemas/Error'
  */
 router.get('/dashboard', authenticate, getDashboardStats);
+
+// Staff commissions report (Admin only)
+router.get('/staffCommissions', authenticate, authorize('admin'), getStaffCommissionsReport);
 
 export default router;

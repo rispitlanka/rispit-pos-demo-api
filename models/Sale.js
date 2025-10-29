@@ -143,7 +143,12 @@ const saleSchema = new mongoose.Schema({
       default: Date.now
     },
     returnReason: String
-  }]
+  }],
+  commissionAmount: {
+    type: Number,
+    default: 0,
+    min: 0
+  }
 }, {
   timestamps: true
 });
@@ -153,5 +158,6 @@ saleSchema.index({ invoiceNumber: 1 });
 saleSchema.index({ createdAt: -1 });
 saleSchema.index({ customer: 1 });
 saleSchema.index({ status: 1 });
+saleSchema.index({ cashier: 1, createdAt: -1 });
 
 export default mongoose.model('Sale', saleSchema);

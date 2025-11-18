@@ -22,7 +22,7 @@ const options = {
         description: 'Development server'
       },
       {
-        url: 'https://rispit-pos-api.onrender.com',
+        url: 'https://rispit-pos-demo-api.onrender.com',
         description: 'Production server'
       }
     ],

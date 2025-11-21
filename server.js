@@ -113,18 +113,18 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log("https://localhost:3000")
-  console.log("https://rispit-pos-api.onrender.com")
+  // console.log("https://rispit-pos-api.onrender.com")
   
   // Start cron job to hit root route every 14 minutes
-  cron.schedule('*/14 * * * *', async () => {
-    try {
-      const response = await fetch(`https://rispit-pos-demo-api.onrender.com`);
-      const data = await response.json();
-      console.log(`Cron job executed at ${new Date().toISOString()} - Status: ${data.status}`);
-    } catch (error) {
-      console.error(`Cron job failed at ${new Date().toISOString()}:`, error.message);
-    }
-  });
+  // cron.schedule('*/14 * * * *', async () => {
+  //   try {
+  //     const response = await fetch(`https://rispit-pos-demo-api.onrender.com`);
+  //     const data = await response.json();
+  //     console.log(`Cron job executed at ${new Date().toISOString()} - Status: ${data.status}`);
+  //   } catch (error) {
+  //     console.error(`Cron job failed at ${new Date().toISOString()}:`, error.message);
+  //   }
+  // });
   
-  console.log('Cron job scheduled: hitting / route every 14 minutes');
+  // console.log('Cron job scheduled: hitting / route every 14 minutes');
 });
